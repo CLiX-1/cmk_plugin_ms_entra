@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+# Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
+
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+import sys
+import argparse
+import json
+from pathlib import Path
+
+import requests
+
+import cmk.utils.password_store
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--tenant-id",
+        dest="tenant_id",
+        required=True,
+        help="The unique ID from the Microsoft Entra tenant.",
+    )
+    parser.add_argument(
+        "--app-id",
+        dest="app_id",
+        required=True,
+        help="The ID of the Micrsoft Entra app registration for Microsoft Graph API requests.",
+    )
+    parser.add_argument(
+        "--app-secret",
+        dest="app_secret",
+        required=True,
+        help="The client secret from the Microsoft Entra app registration.",
+    )
+    parser.add_argument(
+        "--services-to-monitor",
+        dest="services_to_monitor",
+        required=False,
+        help="Microsoft Entra services that you want to monitor.",
+    )
+
+    return parser.parse_args()
+
+
+def get_access_token(tenant_id, app_id, app_secret, resource_scope):
+    token_url = "https://login.microsoftonline.com/" + tenant_id + "/oauth2/v2.0/token"
+
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+    body = {
+        "client_id": app_id,
+        "client_secret": app_secret,
+        "grant_type": "client_credentials",
+        "scope": resource_scope,
+    }
+
+    try:
+        api_response = requests.post(token_url, headers=headers, data=body)
+        api_response.raise_for_status()
+    except requests.exceptions.RequestException as err:
+        sys.stderr.write("CRITICAL | Failed to get access token\n")
+        sys.stderr.write(f"Error: {err}\n")
+        sys.exit(1)
+
+    api_response_json = api_response.json()
+    access_token = api_response_json["access_token"]
+
+    return access_token
+
+
+def get_entra_sync(token, tenant_id):
+    entra_sync_url = (
+        f"https://graph.microsoft.com/v1.0/organization/{tenant_id}"
+        f"?$select=onPremisesLastSyncDateTime,onPremisesSyncEnabled"
+    )
+
+    headers = {"Authorization": "Bearer " + token}
+
+    try:
+        entra_sync_response = requests.get(entra_sync_url, headers=headers)
+        entra_sync_response.raise_for_status()
+    except requests.exceptions.RequestException as err:
+        sys.stderr.write("CRITICAL | Failed to get entra connect sync\n")
+        sys.stderr.write(f"Error: {err}\n")
+        sys.exit(2)
+
+    entra_sync_json = entra_sync_response.json()
+
+    entra_sync = {
+        "sync_enabled": entra_sync_json["onPremisesSyncEnabled"],
+        "sync_last": entra_sync_json["onPremisesLastSyncDateTime"],
+    }
+
+    return entra_sync
+
+
+def get_entra_app_registration_creds(token):
+    entra_app_registrations_url = (
+        "https://graph.microsoft.com/v1.0/applications?$select=appId,displayName,keyCredentials,passwordCredentials"
+    )
+
+    headers = {"Authorization": "Bearer " + token}
+
+    entra_app_registrations = []
+
+    while True:
+        try:
+            entra_app_registration_response = requests.get(entra_app_registrations_url, headers=headers)
+            entra_app_registration_response.raise_for_status()
+        except requests.exceptions.RequestException as err:
+            print(entra_app_registration_response.text)
+            sys.stderr.write("CRITICAL | Failed to get entra app registrations\n")
+            sys.stderr.write(f"Error: {err}\n")
+            sys.exit(2)
+
+        entra_app_registration_json = entra_app_registration_response.json()
+        entra_app_registrations.extend(entra_app_registration_json.get("value", []))
+
+        next_link = entra_app_registration_json.get("@odata.nextLink")
+        if next_link:
+            entra_app_registrations_url = next_link
+        else:
+            break
+
+    app_names = set()
+    app_list = []
+    for app in entra_app_registrations:
+        app_name = app["displayName"]
+        app_id = app["appId"]
+        app_secrets = app.get("passwordCredentials")
+        app_certs = app.get("keyCredentials")
+
+        # generate unique names, because entra app name is not unique
+        if app_name in app_names and (app_secrets or app_certs):
+            app_name_unique = f"{app_name}_{app_id[-4:]}"
+        else:
+            app_name_unique = app_name
+            app_names.add(app_name)
+
+        if app_secrets:
+            app_secrets_list = []
+            for secret in app_secrets:
+                app_secret_details = {
+                    "cred_id": secret["keyId"],
+                    "cred_name": secret["displayName"],
+                    "cred_expiration": secret["endDateTime"],
+                }
+                app_secrets_list.append(app_secret_details)
+
+            app_secret_dict = {
+                "app_name": app_name_unique,
+                "app_id": app_id,
+                "cred_type": "secret",
+                "app_creds": app_secrets_list,
+            }
+            app_list.append(app_secret_dict)
+        if app_certs:
+            app_certs_list = []
+            for cert in app_certs:
+                app_cert_details = {
+                    "cred_id": cert["keyId"],
+                    "cred_name": cert["displayName"],
+                    "cred_expiration": cert["endDateTime"],
+                }
+                app_certs_list.append(app_cert_details)
+
+            app_secret_dict = {
+                "app_name": app_name_unique,
+                "app_id": app_id,
+                "cred_type": "certificate",
+                "app_creds": app_certs_list,
+            }
+            app_list.append(app_secret_dict)
+
+    return app_list
+
+
+def get_entra_saml_certs(token):
+    entra_saml_certs_url = (
+        "https://graph.microsoft.com/beta/servicePrincipals"
+        "?$filter=preferredSingleSignOnMode eq 'saml' and accountEnabled eq true"
+        "&$select=appId,displayName,notes,preferredTokenSigningKeyEndDateTime,preferredTokenSigningKeyThumbprint"
+    )
+
+    headers = {"Authorization": "Bearer " + token}
+
+    entra_saml_certs = []
+
+    while True:
+        try:
+            entra_saml_certs_response = requests.get(entra_saml_certs_url, headers=headers)
+            entra_saml_certs_response.raise_for_status()
+        except requests.exceptions.RequestException as err:
+            print(entra_saml_certs_response.text)
+            sys.stderr.write("CRITICAL | Failed to get entra app registrations\n")
+            sys.stderr.write(f"Error: {err}\n")
+            sys.exit(2)
+
+        entra_saml_certs_json = entra_saml_certs_response.json()
+        entra_saml_certs.extend(entra_saml_certs_json.get("value", []))
+
+        next_link = entra_saml_certs_json.get("@odata.nextLink")
+        if next_link:
+            entra_saml_certs_url = next_link
+        else:
+            break
+
+    app_names = set()
+    app_list = []
+    for app in entra_saml_certs:
+        app_name = app["displayName"]
+        app_id = app["appId"]
+
+        # generate unique names, because entra app name is not unique
+        if app_name in app_names:
+            app_name_unique = f"{app_name}_{app_id[-4:]}"
+        else:
+            app_name_unique = app_name
+            app_names.add(app_name)
+
+        app_dict = {
+            "app_id": app_id,
+            "app_name": app_name_unique,
+            "app_notes": app["notes"],
+            "app_cert_expiration": app["preferredTokenSigningKeyEndDateTime"],
+            "app_cert_thumbprint": app["preferredTokenSigningKeyThumbprint"],
+        }
+
+        app_list.append(app_dict)
+
+    return app_list
+
+
+def main():
+    args = parse_arguments()
+    tenant_id = args.tenant_id
+    app_id = args.app_id
+    services_to_monitor = args.services_to_monitor.split(",") if args.services_to_monitor else None
+
+    pw_id, pw_path = args.app_secret.split(":")
+    app_secret = cmk.utils.password_store.lookup(Path(pw_path), pw_id)
+
+    resource_scope = "https://graph.microsoft.com/.default"
+
+    token = get_access_token(tenant_id, app_id, app_secret, resource_scope)
+
+    if "entra_sync" in services_to_monitor:
+        entra_sync = get_entra_sync(token, tenant_id)
+        if entra_sync:
+            print("<<<ms_entra_sync:sep(0)>>>")
+            print(json.dumps(entra_sync))
+
+    if "entra_app_registration_creds" in services_to_monitor:
+        entra_app_registration_creds = get_entra_app_registration_creds(token)
+        if entra_app_registration_creds:
+            print("<<<ms_entra_app_creds:sep(0)>>>")
+            print(json.dumps(entra_app_registration_creds))
+
+    if "entra_saml_certs" in services_to_monitor:
+        entra_saml_certs = get_entra_saml_certs(token)
+        if entra_saml_certs:
+            print("<<<ms_entra_saml_certs:sep(0)>>>")
+            print(json.dumps(entra_saml_certs))
+
+
+if __name__ == "__main__":
+    main()

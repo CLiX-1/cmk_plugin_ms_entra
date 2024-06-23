@@ -1,0 +1,20 @@
+title: Microsoft Entra: SAML Certificates
+agents: entra
+catalog: cloud/Microsoft
+license: GPLv2
+distribution: Christopher Pommer
+description:
+ This check monitors the expiration time of certificates
+ from Entra enterprise applications with SAML SSO configured.
+
+ The levels {OK}, {WARN} and {CRIT} depends on the
+ configured check levels for the certificate expiration time.
+
+ You have to configure the special agent {Microsoft Entra}.
+
+item:
+ The name of the entra enterprise application.
+
+discovery:
+ One service is created for each entra enterprise application
+ with SAML SSO configured.

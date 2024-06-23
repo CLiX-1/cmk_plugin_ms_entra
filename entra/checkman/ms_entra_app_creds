@@ -1,0 +1,21 @@
+title: Microsoft Entra: App Credentials
+agents: entra
+catalog: cloud/Microsoft
+license: GPLv2
+distribution: Christopher Pommer
+description:
+ This check monitors the expiration time of secrets and
+ certificates from Entra app registrations.
+
+ The levels {OK}, {WARN} and {CRIT} depends on the
+ configured check levels for the certificate expiration time.
+
+ You have to configure the special agent {Microsoft Entra}.
+
+item:
+ The name of the entra app registration and the credential type.
+
+discovery:
+ One service is created for each credential type per entra app
+ registration. For each credential type the credential
+ with the earliest expiration time is selected.
