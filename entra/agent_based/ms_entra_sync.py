@@ -21,7 +21,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from cmk.agent_based.v2 import (
@@ -71,7 +71,7 @@ def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckRes
 
         params_levels_sync_period = params.get("sync_period")
 
-        sync_last_datetime = datetime.fromisoformat(sync_last).replace(tzinfo=timezone.utc)
+        sync_last_datetime = datetime.fromisoformat(sync_last)
         sync_last_timestamp = sync_last_datetime.timestamp()
 
         sync_last_timespan = datetime.now().timestamp() - sync_last_timestamp
