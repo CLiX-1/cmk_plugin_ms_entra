@@ -21,7 +21,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from cmk.agent_based.v2 import (
@@ -95,8 +95,8 @@ def check_ms_entra_saml_certs(item: str, params: Mapping[str, Any], section: Sec
     app_cert_expiration = app["app_cert_expiration"]
     app_cert_thumbprint = app["app_cert_thumbprint"]
 
-    app_cert_expiration_datetime_utc = datetime.fromisoformat(app_cert_expiration).replace(tzinfo=timezone.utc)
-    app_cert_expiration_timestamp = app_cert_expiration_datetime_utc.timestamp()
+    app_cert_expiration_datetime = datetime.fromisoformat(app_cert_expiration)
+    app_cert_expiration_timestamp = app_cert_expiration_datetime.timestamp()
     app_cert_expiration_timestamp_render = render.datetime(int(app_cert_expiration_timestamp))
 
     app_cert_expiration_timespan = app_cert_expiration_timestamp - datetime.now().timestamp()
