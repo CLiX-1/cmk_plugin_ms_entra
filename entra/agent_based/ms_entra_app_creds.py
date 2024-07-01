@@ -21,7 +21,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from cmk.agent_based.v2 import (
@@ -118,8 +118,8 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
 
     result_details_list = []
     for cred in app_creds:
-        cred_expiration_datetime_utc = datetime.fromisoformat(cred["cred_expiration"]).replace(tzinfo=timezone.utc)
-        cred_expiration_timestamp = cred_expiration_datetime_utc.timestamp()
+        cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
+        cred_expiration_timestamp = cred_expiration_datetime.timestamp()
         cred["cred_expiration_timestamp"] = cred_expiration_timestamp
         cred_id = cred["cred_id"]
         cred_name = cred["cred_name"]
