@@ -40,7 +40,8 @@ from cmk.agent_based.v2 import (
 
 @dataclass(frozen=True)
 class EntraSamlApps:
-    app_id: str
+    app_id: str    
+    app_appid: str
     app_name: str
     app_notes: str
     app_cert_expiration: str
@@ -52,6 +53,7 @@ class EntraSamlApps:
 # [
 #  {
 #    "app_id": "00000000-0000-0000-0000-000000000000",
+#    "app_appid": "00000000-0000-0000-0000-000000000000",
 #    "app_name": "SAML App 1,
 #    "app_notes": "SAML App 1 description",
 #    "app_cert_expiration": "2025-01-01T01:00:00Z",
@@ -59,6 +61,7 @@ class EntraSamlApps:
 #  },
 #  {
 #    "app_id": "00000000-0000-0000-0000-000000000000",
+#    "app_appid": "00000000-0000-0000-0000-000000000000",
 #    "app_name": "SAML App 2",
 #    "app_notes": "SAML App 2 description",
 #    "app_cert_expiration": "2026-06-06T13:00:00Z",
@@ -72,8 +75,18 @@ Section = Mapping[str, Sequence[EntraSamlApps]]
 
 def parse_ms_entra_saml_certs(string_table: StringTable) -> Section:
     parsed = {}
+    app_names = set()
     for item in json.loads("".join(string_table[0])):
-        parsed[item["app_name"]] = item
+        app_name = item["app_name"]
+        # generate unique names, because entra app name is not unique
+        if app_name in app_names:
+            app_name_unique = f"{app_name} {item["app_id"][-4:]}"
+        else:
+            app_name_unique = app_name
+            app_names.add(app_name)
+
+        parsed[app_name_unique] = item
+
     return parsed
 
 
@@ -89,7 +102,8 @@ def check_ms_entra_saml_certs(item: str, params: Mapping[str, Any], section: Sec
 
     params_levels_cert_expiration = params.get("cert_expiration")
 
-    app_id = app["app_id"]
+    app_id = app["app_id"]    
+    app_appid = app["app_appid"]
     app_name = app["app_name"]
     app_notes = app["app_notes"]
     app_cert_expiration = app["app_cert_expiration"]
@@ -104,7 +118,8 @@ def check_ms_entra_saml_certs(item: str, params: Mapping[str, Any], section: Sec
     result_details = (
         f"App name: {app_name}"
         f"\\nApp ID: {app_id}"
-        f"\\nApp description: {app_notes}"
+        f"\\nObject ID: {app_id}"
+        f"\\nDescription: {app_notes}"
         f"\\nThumbprint: {app_cert_thumbprint}"
         f"\\nExpiration time: {app_cert_expiration_timestamp_render}"
     )

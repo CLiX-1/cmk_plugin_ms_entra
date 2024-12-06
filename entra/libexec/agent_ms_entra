@@ -68,7 +68,7 @@ def parse_arguments():
     parser.add_argument(
         "--timeout",
         type=float,
-        default=15.0
+        default=15.0,
         help="Timeout for connection"
     )
 
@@ -209,10 +209,11 @@ def get_entra_app_registration_creds(token, proxy, timeout):
 
 
 def get_entra_saml_certs(token, proxy, timeout):
+    # preferredTokenSigningKeyEndDateTime and preferredTokenSigningKeyThumbprint not available in v1.0 (2024-12-06)
     entra_saml_certs_url = (
         "https://graph.microsoft.com/beta/servicePrincipals"
         "?$filter=preferredSingleSignOnMode eq 'saml' and accountEnabled eq true"
-        "&$select=appId,displayName,notes,preferredTokenSigningKeyEndDateTime,preferredTokenSigningKeyThumbprint"
+        "&$select=id,appId,displayName,notes,preferredTokenSigningKeyEndDateTime,preferredTokenSigningKeyThumbprint"
     )
 
     headers = {"Authorization": "Bearer " + token}
@@ -238,28 +239,20 @@ def get_entra_saml_certs(token, proxy, timeout):
         else:
             break
 
-    app_names = set()
     app_list = []
     for app in entra_saml_certs:
-        app_name = app["displayName"]
-        app_id = app["appId"]
-
-        # generate unique names, because entra app name is not unique
-        if app_name in app_names:
-            app_name_unique = f"{app_name}_{app_id[-4:]}"
-        else:
-            app_name_unique = app_name
-            app_names.add(app_name)
-
         app_dict = {
-            "app_id": app_id,
-            "app_name": app_name_unique,
+            "app_id": app["id"],
+            "app_appid": ["app_appid"],
+            "app_name": app["displayName"],
             "app_notes": app["notes"],
             "app_cert_expiration": app["preferredTokenSigningKeyEndDateTime"],
             "app_cert_thumbprint": app["preferredTokenSigningKeyThumbprint"],
         }
 
         app_list.append(app_dict)
+
+    app_list.sort(key=lambda x: x["app_id"])
 
     return app_list
 

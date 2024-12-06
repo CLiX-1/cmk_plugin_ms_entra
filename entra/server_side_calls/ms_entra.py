@@ -20,6 +20,7 @@
 
 from collections.abc import Iterator, Sequence
 from pydantic import BaseModel
+from typing import Optional
 
 from cmk.server_side_calls.v1 import (
     EnvProxy,
@@ -38,7 +39,7 @@ class Params(BaseModel):
     app_secret: Secret
     proxy: URLProxy | NoProxy | EnvProxy | None = None
     services_to_monitor: Sequence[str] = []
-    timeout: Optional[float] = "15.0"
+    timeout: Optional[float] = 15.0
 
 
 def commands_function(
