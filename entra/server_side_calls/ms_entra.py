@@ -38,6 +38,7 @@ class Params(BaseModel):
     app_secret: Secret
     proxy: URLProxy | NoProxy | EnvProxy | None = None
     services_to_monitor: Sequence[str] = []
+    timeout: Optional[float] = "15.0"
 
 
 def commands_function(
@@ -51,6 +52,8 @@ def commands_function(
         params.app_id,
         "--app-secret",
         params.app_secret,
+        "--timeout",
+        str(params.timeout),
     ]
 
     if params.services_to_monitor:

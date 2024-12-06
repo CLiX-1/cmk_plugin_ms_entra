@@ -28,6 +28,8 @@ from cmk.rulesets.v1.form_specs import (
     MultipleChoice,
     MultipleChoiceElement,
     Password,
+    TimeSpan,
+    TimeMagnitude,
     Proxy,
     String,
 )
@@ -137,6 +139,13 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                     ),
                 ),
                 required=True,
+            ),
+            "timeout": DictElement(
+                parameter_form = TimeSpan(
+                    title = Title("Timeout"),
+                    displayed_magnitudes=[TimeMagnitude.MILLISECOND, TimeMagnitude.SECOND],
+                    prefill = DefaultValue(15.0),
+                ),
             ),
         },
     )
