@@ -129,7 +129,7 @@ def get_entra_sync(token, tenant_id, proxy, timeout):
 
 def get_entra_app_registration_creds(token, proxy, timeout):
     entra_app_registrations_url = (
-        "https://graph.microsoft.com/v1.0/applications?$select=appId,displayName,keyCredentials,passwordCredentials"
+        "https://graph.microsoft.com/v1.0/applications?$select=appId,id,notes,displayName,keyCredentials,passwordCredentials"
     )
 
     headers = {"Authorization": "Bearer " + token}
@@ -159,7 +159,9 @@ def get_entra_app_registration_creds(token, proxy, timeout):
     app_list = []
     for app in entra_app_registrations:
         app_name = app["displayName"]
-        app_id = app["appId"]
+        app_appid = app["appId"]
+        app_id = app["id"]
+        app_notes = app["notes"]
         app_secrets = app.get("passwordCredentials")
         app_certs = app.get("keyCredentials")
 
@@ -182,7 +184,9 @@ def get_entra_app_registration_creds(token, proxy, timeout):
 
             app_secret_dict = {
                 "app_name": app_name_unique,
+                "app_appid": app_appid,
                 "app_id": app_id,
+                "app_notes": app_notes,
                 "cred_type": "secret",
                 "app_creds": app_secrets_list,
             }
@@ -199,7 +203,9 @@ def get_entra_app_registration_creds(token, proxy, timeout):
 
             app_secret_dict = {
                 "app_name": app_name_unique,
+                "app_appid": app_appid,
                 "app_id": app_id,
+                "app_notes": app_notes,
                 "cred_type": "certificate",
                 "app_creds": app_certs_list,
             }
@@ -213,7 +219,7 @@ def get_entra_saml_certs(token, proxy, timeout):
     entra_saml_certs_url = (
         "https://graph.microsoft.com/beta/servicePrincipals"
         "?$filter=preferredSingleSignOnMode eq 'saml' and accountEnabled eq true"
-        "&$select=id,appId,displayName,notes,preferredTokenSigningKeyEndDateTime,preferredTokenSigningKeyThumbprint"
+        "&$select=appId,id,displayName,notes,preferredTokenSigningKeyEndDateTime,preferredTokenSigningKeyThumbprint"
     )
 
     headers = {"Authorization": "Bearer " + token}
@@ -242,8 +248,8 @@ def get_entra_saml_certs(token, proxy, timeout):
     app_list = []
     for app in entra_saml_certs:
         app_dict = {
+            "app_appid": app["appId"],
             "app_id": app["id"],
-            "app_appid": ["app_appid"],
             "app_name": app["displayName"],
             "app_notes": app["notes"],
             "app_cert_expiration": app["preferredTokenSigningKeyEndDateTime"],

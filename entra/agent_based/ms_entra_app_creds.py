@@ -41,7 +41,9 @@ from cmk.agent_based.v2 import (
 @dataclass(frozen=True)
 class EntraApps:
     app_name: str
+    app_appid: str
     app_id: str
+    app_notes: str
     cred_type: str
     app_creds: list
 
@@ -51,7 +53,9 @@ class EntraApps:
 # [
 #   {
 #     "app_name": "App Registration 1",
+#     "app_appid": "00000000-0000-0000-0000-000000000000",
 #     "app_id": "00000000-0000-0000-0000-000000000000",
+#     "app_notes": "Description of App Registration 1",
 #     "cred_type": "Certificate",
 #     "app_creds": [
 #       {
@@ -63,7 +67,9 @@ class EntraApps:
 #   },
 #   {
 #     "app_name": "App Registration 2",
+#     "app_appid": "00000000-0000-0000-0000-000000000000",
 #     "app_id": "00000000-0000-0000-0000-000000000000",
+#     "app_notes": "Description of App Registration 2",
 #     "cred_type": "Secret",
 #     "app_creds": [
 #       {
@@ -111,8 +117,10 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
 
     params_levels_cred_expiration = params.get("cred_expiration")
 
+    app_appid = app["app_appid"]
     app_id = app["app_id"]
     app_name = app["app_name"]
+    app_notes = app["app_notes"]
     cred_type = app["cred_type"].capitalize()
     app_creds = app["app_creds"]
 
@@ -124,12 +132,14 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
         cred_id = cred["cred_id"]
         cred_name = cred["cred_name"]
         cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
-        cred_details = (
-            f"{cred_name}\\n - {cred_type} ID: {cred_id}\\n - Expiration time: {cred_expiration_timestamp_render}"
-        )
+        cred_details = f"{cred_type}"
+        cred_details += f" ({cred_name})" if cred_name else ""
+        cred_details += f"\\n - ID: {cred_id}\\n - Expiration time: {cred_expiration_timestamp_render}"
         result_details_list.append(cred_details)
 
-    result_details = f"App name: {app_name}\\nApp ID: {app_id}\\n\\n{'\\n\\n'.join(result_details_list)}"
+    result_details = f"App name: {app_name}\\nApp ID: {app_appid}\\nObject ID: {app_id}\\n\\nDescription: "
+    result_details += f"{app_notes}" if app_notes else "---"
+    result_details += f"\\n\\n{'\\n\\n'.join(result_details_list)}"
 
     cred_earliest_expiration = get_cred_with_earliest_expiration(app_creds)
 

@@ -40,7 +40,7 @@ from cmk.agent_based.v2 import (
 
 @dataclass(frozen=True)
 class EntraSamlApps:
-    app_id: str    
+    app_id: str
     app_appid: str
     app_name: str
     app_notes: str
@@ -102,7 +102,7 @@ def check_ms_entra_saml_certs(item: str, params: Mapping[str, Any], section: Sec
 
     params_levels_cert_expiration = params.get("cert_expiration")
 
-    app_id = app["app_id"]    
+    app_id = app["app_id"]
     app_appid = app["app_appid"]
     app_name = app["app_name"]
     app_notes = app["app_notes"]
@@ -115,14 +115,10 @@ def check_ms_entra_saml_certs(item: str, params: Mapping[str, Any], section: Sec
 
     app_cert_expiration_timespan = app_cert_expiration_timestamp - datetime.now().timestamp()
 
-    result_details = (
-        f"App name: {app_name}"
-        f"\\nApp ID: {app_id}"
-        f"\\nObject ID: {app_id}"
-        f"\\nDescription: {app_notes}"
-        f"\\nThumbprint: {app_cert_thumbprint}"
-        f"\\nExpiration time: {app_cert_expiration_timestamp_render}"
-    )
+    result_details = f"App name: {app_name}\\nApp ID: {app_appid}\\nObject ID: {app_id}\\n\\nDescription: "
+    result_details += f"{app_notes}" if app_notes else "---"
+    result_details += f"\\n\\nCertificate\\n - Thumbprint: {app_cert_thumbprint}\\n - Expiration time: {app_cert_expiration_timestamp_render}"
+
     result_summary = f"Expiration time: {app_cert_expiration_timestamp_render}"
 
     if app_cert_expiration_timespan > 0:
