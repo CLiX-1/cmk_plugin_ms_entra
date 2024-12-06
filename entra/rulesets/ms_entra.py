@@ -24,9 +24,11 @@ from cmk.rulesets.v1.form_specs import (
     DictElement,
     Dictionary,
     FieldSize,
+    migrate_to_proxy,
     MultipleChoice,
     MultipleChoiceElement,
     Password,
+    Proxy,
     String,
 )
 from cmk.rulesets.v1.form_specs.validators import LengthInRange, MatchRegex
@@ -87,6 +89,12 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                     help_text=Help("The client secret from the Microsoft Entra app registration."),
                 ),
                 required=True,
+            ),
+            "proxy": DictElement(
+                parameter_form=Proxy(
+                    title=Title("HTTP proxy"),
+                    migrate=migrate_to_proxy,
+                ),
             ),
             "services_to_monitor": DictElement(
                 parameter_form=MultipleChoice(
