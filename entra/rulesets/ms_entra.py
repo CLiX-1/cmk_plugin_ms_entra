@@ -24,14 +24,13 @@ from cmk.rulesets.v1.form_specs import (
     DictElement,
     Dictionary,
     FieldSize,
-    migrate_to_proxy,
     MultipleChoice,
     MultipleChoiceElement,
     Password,
-    TimeSpan,
-    TimeMagnitude,
     Proxy,
     String,
+    TimeMagnitude,
+    TimeSpan,
 )
 from cmk.rulesets.v1.form_specs.validators import LengthInRange, MatchRegex
 from cmk.rulesets.v1.rule_specs import SpecialAgent, Topic
@@ -95,7 +94,6 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
             "proxy": DictElement(
                 parameter_form=Proxy(
                     title=Title("HTTP proxy"),
-                    migrate=migrate_to_proxy,
                 ),
             ),
             "services_to_monitor": DictElement(
