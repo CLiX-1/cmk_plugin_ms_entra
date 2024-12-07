@@ -139,14 +139,14 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                 required=True,
             ),
             "timeout": DictElement(
-                parameter_form = TimeSpan(
-                    title = Title("Timeout"),
+                parameter_form=TimeSpan(
+                    title=Title("Timeout"),
                     help_text=Help(
                         "Define a custom timeout in seconds to use for each API request. The timeout is used for "
                         "token request and any service that should be monitored. The default timeout is 15s."
                     ),
                     displayed_magnitudes=[TimeMagnitude.SECOND],
-                    prefill = DefaultValue(15.0),
+                    prefill=DefaultValue(15.0),
                     custom_validate=[
                         NumberInRange(
                             min_value=5,

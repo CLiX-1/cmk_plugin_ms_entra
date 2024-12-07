@@ -117,7 +117,10 @@ def check_ms_entra_saml_certs(item: str, params: Mapping[str, Any], section: Sec
 
     result_details = f"App name: {app_name}\\nApp ID: {app_appid}\\nObject ID: {app_id}\\n\\nDescription: "
     result_details += f"{app_notes}" if app_notes else "---"
-    result_details += f"\\n\\nCertificate\\n - Thumbprint: {app_cert_thumbprint}\\n - Expiration time: {app_cert_expiration_timestamp_render}"
+    result_details += (
+        f"\\n\\nCertificate\\n - Thumbprint: {app_cert_thumbprint}\\n"
+        f" - Expiration time: {app_cert_expiration_timestamp_render}"
+    )
 
     result_summary = f"Expiration time: {app_cert_expiration_timestamp_render}"
 

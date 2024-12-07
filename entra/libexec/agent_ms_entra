@@ -26,7 +26,7 @@ from pathlib import Path
 import requests
 
 import cmk.utils.password_store
-from cmk.utils.http_proxy_config import deserialize_http_proxy_config, HTTPProxyConfig
+from cmk.utils.http_proxy_config import deserialize_http_proxy_config
 
 
 def parse_arguments():
@@ -54,10 +54,7 @@ def parse_arguments():
         type=str,
         default=None,
         metavar="PROXY",
-        help=(
-            "HTTP proxy used to connect to the MS Graph API. If not set, the environment settings "
-            "will be used."
-        ),
+        help=("HTTP proxy used to connect to the MS Graph API. If not set, the environment settings " "will be used."),
     )
     parser.add_argument(
         "--services-to-monitor",
@@ -65,12 +62,7 @@ def parse_arguments():
         required=False,
         help="Microsoft Entra services that you want to monitor.",
     )
-    parser.add_argument(
-        "--timeout",
-        type=float,
-        default=15.0,
-        help="Timeout for connection"
-    )
+    parser.add_argument("--timeout", type=float, default=15.0, help="Timeout for connection")
 
     return parser.parse_args()
 
@@ -88,7 +80,9 @@ def get_access_token(tenant_id, app_id, app_secret, resource_scope, proxy, timeo
     }
 
     try:
-        api_response = requests.post(token_url, headers=headers, data=body, proxies=proxy.to_requests_proxies(), timeout=timeout)
+        api_response = requests.post(
+            token_url, headers=headers, data=body, proxies=proxy.to_requests_proxies(), timeout=timeout
+        )
         api_response.raise_for_status()
     except requests.exceptions.RequestException as err:
         sys.stderr.write("CRITICAL | Failed to get access token\n")
@@ -110,7 +104,9 @@ def get_entra_sync(token, tenant_id, proxy, timeout):
     headers = {"Authorization": "Bearer " + token}
 
     try:
-        entra_sync_response = requests.get(entra_sync_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout)
+        entra_sync_response = requests.get(
+            entra_sync_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout
+        )
         entra_sync_response.raise_for_status()
     except requests.exceptions.RequestException as err:
         sys.stderr.write("CRITICAL | Failed to get entra connect sync\n")
@@ -129,7 +125,8 @@ def get_entra_sync(token, tenant_id, proxy, timeout):
 
 def get_entra_app_registration_creds(token, proxy, timeout):
     entra_app_registrations_url = (
-        "https://graph.microsoft.com/v1.0/applications?$select=appId,id,notes,displayName,keyCredentials,passwordCredentials"
+        "https://graph.microsoft.com/v1.0/applications"
+        "?$select=appId,id,notes,displayName,keyCredentials,passwordCredentials"
     )
 
     headers = {"Authorization": "Bearer " + token}
@@ -138,7 +135,9 @@ def get_entra_app_registration_creds(token, proxy, timeout):
 
     while True:
         try:
-            entra_app_registration_response = requests.get(entra_app_registrations_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout)
+            entra_app_registration_response = requests.get(
+                entra_app_registrations_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout
+            )
             entra_app_registration_response.raise_for_status()
         except requests.exceptions.RequestException as err:
             print(entra_app_registration_response.text)
@@ -228,7 +227,9 @@ def get_entra_saml_certs(token, proxy, timeout):
 
     while True:
         try:
-            entra_saml_certs_response = requests.get(entra_saml_certs_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout)
+            entra_saml_certs_response = requests.get(
+                entra_saml_certs_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout
+            )
             entra_saml_certs_response.raise_for_status()
         except requests.exceptions.RequestException as err:
             print(entra_saml_certs_response.text)
