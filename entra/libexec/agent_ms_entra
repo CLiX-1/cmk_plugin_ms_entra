@@ -54,7 +54,7 @@ def parse_arguments():
         type=str,
         default=None,
         metavar="PROXY",
-        help=("HTTP proxy used to connect to the MS Graph API. If not set, the environment settings " "will be used."),
+        help=("HTTP proxy used to connect to the MS Graph API. If not set, the environment settings will be used."),
     )
     parser.add_argument(
         "--services-to-monitor",
