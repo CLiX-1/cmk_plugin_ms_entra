@@ -28,6 +28,7 @@ from cmk.rulesets.v1.form_specs import (
     DictElement,
     Dictionary,
     FieldSize,
+    InputHint,
     MultipleChoice,
     MultipleChoiceElement,
     Password,
@@ -169,7 +170,7 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                         "monitored. The default timeout is 10s."
                     ),
                     displayed_magnitudes=[TimeMagnitude.SECOND],
-                    prefill=DefaultValue(10.0),
+                    prefill=InputHint(10.0),
                     custom_validate=[
                         NumberInRange(
                             min_value=3,
