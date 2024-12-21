@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
 # Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
 
@@ -16,6 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+####################################################################################################
+# Checkmk ruleset to configure the Microsoft Entra special agent.
 
 
 from cmk.rulesets.v1 import Help, Message, Title
@@ -41,11 +45,10 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
         title=Title("Microsoft Entra"),
         help_text=Help(
             "This special agent requests data from Microsoft Entra using the Microsoft Graph API. "
-            "To monitor these resources, add this rule to a single host. You must configure "
-            "a Microsoft Entra app registration. For the required permissions, see the "
-            "help sections under <b>Microsoft Entra services to monitor</b>. "
-            "You may also want to adjust the query interval with the rule "
-            "<b>Normal check interval for service checks</b>."
+            "To monitor these resources, add this rule to a single host. You must configure a "
+            "Microsoft Entra app registration. For the required permissions, see the help sections "
+            "under <b>Microsoft Entra services to monitor</b>. You may also want to adjust "
+            "the query interval with the rule <b>Normal check interval for service checks</b>."
         ),
         elements={
             "tenant_id": DictElement(
@@ -55,12 +58,17 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                     field_size=FieldSize.LARGE,
                     custom_validate=[
                         MatchRegex(
-                            regex="^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-                            error_msg=Message("Tenant ID / Directory ID must be in 36-character GUID format."),
+                            regex="^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+                            "[0-9a-fA-F]{12}$",
+                            error_msg=Message(
+                                "Tenant ID / Directory ID must be in 36-character GUID format."
+                            ),
                         ),
                         LengthInRange(
                             min_value=36,
-                            error_msg=Message("Tenant ID / Directory ID must be in 36-character GUID format."),
+                            error_msg=Message(
+                                "Tenant ID / Directory ID must be in 36-character GUID format."
+                            ),
                         ),
                     ],
                 ),
@@ -69,16 +77,24 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
             "app_id": DictElement(
                 parameter_form=String(
                     title=Title("Client ID / Application ID"),
-                    help_text=Help("The ID of the Micrsoft Entra app registration for Microsoft Graph API requests."),
+                    help_text=Help(
+                        "The App ID of the Micrsoft Entra app registration for Microsoft Graph API "
+                        "requests."
+                    ),
                     field_size=FieldSize.LARGE,
                     custom_validate=[
                         MatchRegex(
-                            regex="^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-                            error_msg=Message("Client ID / Application ID must be in 36-character GUID format."),
+                            regex="^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+                            "[0-9a-fA-F]{12}$",
+                            error_msg=Message(
+                                "Client ID / Application ID must be in 36-character GUID format."
+                            ),
                         ),
                         LengthInRange(
                             min_value=36,
-                            error_msg=Message("Client ID / Application ID must be in 36-character GUID format."),
+                            error_msg=Message(
+                                "Client ID / Application ID must be in 36-character GUID format."
+                            ),
                         ),
                     ],
                 ),
@@ -94,6 +110,10 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
             "proxy": DictElement(
                 parameter_form=Proxy(
                     title=Title("HTTP proxy"),
+                    help_text=Help(
+                        "The HTTP proxy used to connect to the Microsoft Graph API. If not set, "
+                        "the environment settings will be used."
+                    ),
                 ),
             ),
             "services_to_monitor": DictElement(
@@ -101,12 +121,12 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                     title=Title("Microsoft Entra services to monitor"),
                     help_text=Help(
                         "Select the Microsoft Entra services that you want to monitor. Ensure "
-                        "that you add the required Microsoft Graph API permissions to "
-                        "your Microsoft Entra app registration and grant admin consent "
-                        "to them. For Entra connnect/cloud sync, you must configure at least the "
-                        "<tt>Organization.Read.All</tt> API application permission. "
-                        "For Entra app registration credentials and Entra SAML certificates, you must "
-                        "configure at least the <tt>Application.Read.All</tt> API application permission. "
+                        "that you add the required Microsoft Graph API permissions to your "
+                        "Microsoft Entra app registration and grant admin consent to them."
+                        "For Entra connnect/cloud sync, you must configure at least the "
+                        "<tt>Organization.Read.All</tt> API application permission. For Entra app "
+                        "registration credentials and Entra SAML certificates, you must configure "
+                        "at least the <tt>Application.Read.All</tt> API application permission."
                     ),
                     elements=[
                         MultipleChoiceElement(
@@ -125,7 +145,9 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                     custom_validate=[
                         LengthInRange(
                             min_value=1,
-                            error_msg=Message("Select one or more <b>Microsoft Entra services to monitor</b>"),
+                            error_msg=Message(
+                                "Select one or more <b>Microsoft Entra services to monitor</b>"
+                            ),
                         ),
                     ],
                     prefill=DefaultValue(
@@ -140,18 +162,19 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
             ),
             "timeout": DictElement(
                 parameter_form=TimeSpan(
-                    title=Title("Timeout"),
+                    title=Title("Timeout for each API request"),
                     help_text=Help(
-                        "Define a custom timeout in seconds to use for each API request. The timeout is used for "
-                        "token request and any service that should be monitored. The default timeout is 15s."
+                        "Define a custom timeout in seconds to use for each API request. The "
+                        "timeout is used for token request and any service that should be "
+                        "monitored. The default timeout is 10s."
                     ),
                     displayed_magnitudes=[TimeMagnitude.SECOND],
-                    prefill=DefaultValue(15.0),
+                    prefill=DefaultValue(10.0),
                     custom_validate=[
                         NumberInRange(
-                            min_value=5,
+                            min_value=3,
                             max_value=600,
-                            error_msg=Message("The timeout must be between 5s and 600s."),
+                            error_msg=Message("The timeout must be between 3s and 600s."),
                         ),
                     ],
                 ),

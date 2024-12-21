@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
 # Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
 
@@ -18,11 +18,56 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+####################################################################################################
+# Checkmk check plugin for monitoring the expiration of secrests and certificates from
+# Microsoft Entra App Registrations.
+# The plugin works with data from the Microsoft Entra Special Agent (ms_entra).
+
+# Example data from special agent:
+# <<<ms_entra_app_creds:sep(0)>>>
+# [
+#   {
+#     "app_name": "App Registration 1",
+#     "app_appid": "00000000-0000-0000-0000-000000000000",
+#     "app_id": "00000000-0000-0000-0000-000000000000",
+#     "app_notes": "Description of App Registration 1",
+#     "cred_type": "Certificate",
+#     "app_creds": [
+#       {
+#         "cred_id": "00000000-0000-0000-0000-000000000000",
+#         "cred_name": "Cert Name 1",
+#         "cred_expiration": "1970-01-01T01:00:00Z"
+#       }
+#     ]
+#   },
+#   {
+#     "app_name": "App Registration 2",
+#     "app_appid": "00000000-0000-0000-0000-000000000000",
+#     "app_id": "00000000-0000-0000-0000-000000000000",
+#     "app_notes": "Description of App Registration 2",
+#     "cred_type": "Secret",
+#     "app_creds": [
+#       {
+#         "cred_id": "00000000-0000-0000-0000-000000000000",
+#         "cred_name": "Secret Name 1",
+#         "cred_expiration": "1970-01-01T01:00:00Z"
+#       },
+#       {
+#         "cred_id": "00000000-0000-0000-0000-000000000000",
+#         "cred_name": "Secret Name 2",
+#         "cred_expiration": "1970-01-01T01:00:00Z"
+#       }
+#     ]
+#   },
+#   ...
+# ]
+
+
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, List, Optional, TypedDict
 
 from cmk.agent_based.v2 import (
     AgentSection,
@@ -38,62 +83,30 @@ from cmk.agent_based.v2 import (
 )
 
 
+class AppCred(TypedDict):
+    cred_id: str
+    cred_name: Optional[str]
+    cred_expiration: str
+
+
 @dataclass(frozen=True)
-class EntraApps:
+class AppRegistration:
     app_name: str
     app_appid: str
     app_id: str
-    app_notes: str
+    app_notes: Optional[str]
     cred_type: str
-    app_creds: list
+    app_creds: List[AppCred]
 
 
-# Example data from special agent:
-# <<<ms_entra_app_creds:sep(0)>>>
-# [
-#   {
-#     "app_name": "App Registration 1",
-#     "app_appid": "00000000-0000-0000-0000-000000000000",
-#     "app_id": "00000000-0000-0000-0000-000000000000",
-#     "app_notes": "Description of App Registration 1",
-#     "cred_type": "Certificate",
-#     "app_creds": [
-#       {
-#         "cred_id": "00000000-0000-0000-0000-000000000000",
-#         "cred_name": "Cert Name 1",
-#         "cred_expiration": "2032-09-26T22:00:00Z"
-#       }
-#     ]
-#   },
-#   {
-#     "app_name": "App Registration 2",
-#     "app_appid": "00000000-0000-0000-0000-000000000000",
-#     "app_id": "00000000-0000-0000-0000-000000000000",
-#     "app_notes": "Description of App Registration 2",
-#     "cred_type": "Secret",
-#     "app_creds": [
-#       {
-#         "cred_id": "00000000-0000-0000-0000-000000000000",
-#         "cred_name": "Secret Name 1",
-#         "cred_expiration": "2026-06-03T12:44:17.463Z"
-#       },
-#       {
-#         "cred_id": "00000000-0000-0000-0000-000000000000",
-#         "cred_name": "Secret Name 2",
-#         "cred_expiration": "2025-02-07T10:45:13.016Z"
-#       }
-#     ]
-#   },
-#   ...
-# ]
-
-Section = Mapping[str, Sequence[EntraApps]]
+Section = Mapping[str, AppRegistration]
 
 
 def parse_ms_entra_app_creds(string_table: StringTable) -> Section:
     parsed = {}
     for item in json.loads("".join(string_table[0])):
-        parsed[item["app_name"] + " - " + item["cred_type"]] = item
+        service_name = f"{item['app_name']} - {item['cred_type']}"
+        parsed[service_name] = AppRegistration(**item)
     return parsed
 
 
@@ -105,7 +118,10 @@ def discover_ms_entra_app_creds(section: Section) -> DiscoveryResult:
 def get_cred_with_earliest_expiration(app_creds):
     cred_earliest_expiration = app_creds[0]
     for cred in app_creds:
-        if cred["cred_expiration_timestamp"] < cred_earliest_expiration["cred_expiration_timestamp"]:
+        if (
+            cred["cred_expiration_timestamp"]
+            < cred_earliest_expiration["cred_expiration_timestamp"]
+        ):
             cred_earliest_expiration = cred
     return cred_earliest_expiration
 
@@ -117,41 +133,48 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
 
     params_levels_cred_expiration = params.get("cred_expiration")
 
-    app_appid = app["app_appid"]
-    app_id = app["app_id"]
-    app_name = app["app_name"]
-    app_notes = app["app_notes"]
-    cred_type = app["cred_type"].capitalize()
-    app_creds = app["app_creds"]
+    cred_type = app.cred_type.capitalize()
 
+    credentials = []
     result_details_list = []
-    for cred in app_creds:
+    for cred in app.app_creds:
         cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
         cred_expiration_timestamp = cred_expiration_datetime.timestamp()
-        cred["cred_expiration_timestamp"] = cred_expiration_timestamp
-        cred_id = cred["cred_id"]
-        cred_name = cred["cred_name"]
         cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
+
         cred_details = f"{cred_type}"
-        cred_details += f" ({cred_name})" if cred_name else ""
-        cred_details += f"\\n - ID: {cred_id}\\n - Expiration time: {cred_expiration_timestamp_render}"
+        cred_details += f" ({cred["cred_name"]})" if cred["cred_name"] else ""
+        cred_details += (
+            f"\n - ID: {cred["cred_id"]}\n - Expiration time: {cred_expiration_timestamp_render}"
+        )
         result_details_list.append(cred_details)
 
-    result_details = f"App name: {app_name}\\nApp ID: {app_appid}\\nObject ID: {app_id}\\n\\nDescription: "
-    result_details += f"{app_notes}" if app_notes else "---"
-    result_details += f"\\n\\n{'\\n\\n'.join(result_details_list)}"
+        credential_dict = {
+            "cred_expiration_timestamp": cred_expiration_timestamp,
+            "cred_id": cred["cred_id"],
+            "cred_name": cred["cred_name"],
+        }
+        credentials.append(credential_dict)
 
-    cred_earliest_expiration = get_cred_with_earliest_expiration(app_creds)
+    result_details = (
+        f"App name: {app.app_name}\nApp ID: {app.app_appid}\nObject ID: {app.app_id}"
+        "\n\nDescription: "
+    )
+    result_details += f"{app.app_notes}" if app.app_notes else "---"
+    result_details += f"\n\n{'\n\n'.join(result_details_list)}"
 
+    # Credential with earliest expiration time and timespan calculation
+    cred_earliest_expiration = get_cred_with_earliest_expiration(credentials)
     cred_earliest_expiration_name = cred_earliest_expiration["cred_name"]
     cred_earliest_expiration_timestamp = int(cred_earliest_expiration["cred_expiration_timestamp"])
     cred_earliest_expiration_timestamp_render = render.datetime(cred_earliest_expiration_timestamp)
-
     cred_expiration_timespan = cred_earliest_expiration_timestamp - datetime.now().timestamp()
 
     result_summary = f"Expiration time: {cred_earliest_expiration_timestamp_render}"
     result_summary += (
-        f", {cred_type} name: {cred_earliest_expiration_name}" if cred_earliest_expiration_name is not None else ""
+        f", Name: {cred_earliest_expiration_name}"
+        if cred_earliest_expiration_name is not None
+        else ""
     )
 
     if cred_expiration_timespan > 0:
@@ -166,13 +189,13 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
             cred_expiration_timespan,
             levels_lower=(params_levels_cred_expiration),
             label="Expired",
-            render_func=lambda x: "%s ago" % render.timespan(abs(x)),
+            render_func=lambda x: f"{render.timespan(abs(x))} ago",
         )
 
     yield Result(
         state=State.OK,
         summary=result_summary,
-        details=f"\\n{result_details}",
+        details=f"\n{result_details}",
     )
 
 

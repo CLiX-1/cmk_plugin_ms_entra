@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
 # Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
 
@@ -16,6 +16,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+####################################################################################################
+# Checkmk ruleset to set the expiration time thresholds for Microsoft Entra app registration
+# credentials. This ruleset is part of the Microsoft Entra special agent (ms_entra).
 
 
 from cmk.rulesets.v1 import Help, Title
@@ -35,18 +40,18 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
     return Dictionary(
         title=Title("Microsoft Entra App Credentials"),
         help_text=Help(
-            "Parameters for the expiration time thresholds from Microsoft Entra app registration credentials "
-            "like secrets and certificates. "
-            "To use this service, you need to set up the <b>Microsoft Entra</b> special agent."
+            "Parameters for the expiration time thresholds from Microsoft Entra app registration "
+            "credentials like secrets and certificates. To use this service, you need to set up "
+            "the <b>Microsoft Entra</b> special agent."
         ),
         elements={
             "cred_expiration": DictElement(
                 parameter_form=SimpleLevels[float](
                     title=Title("Credential expiration"),
                     help_text=Help(
-                        "Specify the lower levels for the Microsoft Entra app credential expiration time. "
-                        "The default values are 14 days (WARN) and 5 days (CRIT). "
-                        "To ignore the credential expiration, select 'No levels'."
+                        "Specify the lower levels for the Microsoft Entra app credential "
+                        "expiration time. The default values are 14 days (WARN) and 5 days "
+                        "(CRIT). To ignore the credential expiration, select 'No levels'."
                     ),
                     form_spec_template=TimeSpan(
                         displayed_magnitudes=[

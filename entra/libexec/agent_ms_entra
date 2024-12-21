@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
 # Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
 
@@ -18,57 +18,89 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+####################################################################################################
+# This Checkmk plugin (Special Agent) retrieves information from Microsoft Entra using the Microsoft
+# Graph API. The plugin can be used to monitor the status of the Entra Connect Sync, the credentials
+# of the Entra app registrations, and the SAML certificate from Entra service principals.
+
+
 import sys
 import argparse
 import json
 from pathlib import Path
+from typing import List, Optional, TypedDict
 
 import requests
 
 import cmk.utils.password_store
-from cmk.utils.http_proxy_config import deserialize_http_proxy_config
+from cmk.utils.http_proxy_config import deserialize_http_proxy_config, HTTPProxyConfig
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--tenant-id",
-        dest="tenant_id",
-        required=True,
-        help="The unique ID from the Microsoft Entra tenant.",
+        "--tenant-id", required=True, help="The unique ID from the Microsoft Entra tenant."
     )
     parser.add_argument(
         "--app-id",
-        dest="app_id",
         required=True,
-        help="The ID of the Micrsoft Entra app registration for Microsoft Graph API requests.",
+        help="The App ID of the Microsoft Entra app registration for Microsoft Graph API requests.",
     )
     parser.add_argument(
         "--app-secret",
-        dest="app_secret",
         required=True,
         help="The client secret from the Microsoft Entra app registration.",
     )
     parser.add_argument(
         "--proxy",
-        type=str,
-        default=None,
-        metavar="PROXY",
-        help=("HTTP proxy used to connect to the MS Graph API. If not set, the environment settings will be used."),
+        required=False,
+        help=(
+            "The HTTP proxy used to connect to the Microsoft Graph API. If not set, the "
+            "environment settings will be used."
+        ),
     )
     parser.add_argument(
         "--services-to-monitor",
-        dest="services_to_monitor",
         required=False,
-        help="Microsoft Entra services that you want to monitor.",
+        help=(
+            "Comma-separated list of Microsoft Entra services you want to monitor. "
+            "Possible values: entra_sync, entra_app_registration_creds, entra_saml_certs"
+        ),
     )
-    parser.add_argument("--timeout", type=float, default=15.0, help="Timeout for connection")
+    parser.add_argument(
+        "--timeout",
+        required=False,
+        type=float,
+        default=10.0,
+        help=(
+            "Define a custom timeout in seconds to use for each API request. The "
+            "timeout is used for token request and any service that should be "
+            "monitored. The default timeout is 10s."
+        ),
+    )
 
     return parser.parse_args()
 
 
-def get_access_token(tenant_id, app_id, app_secret, resource_scope, proxy, timeout):
-    token_url = "https://login.microsoftonline.com/" + tenant_id + "/oauth2/v2.0/token"
+def handle_error(err: Exception, context: str = "", exit_code: int = 1) -> None:
+    if err.response and err.response.text:
+        sys.stderr.write(
+            f"{err}\n\nResponse: {getattr(err.response, 'text', '---')}\n\n{context}\n"
+        )
+    else:
+        sys.stderr.write(f"{err}\n\n{context}\n")
+    sys.exit(exit_code)
+
+
+def get_access_token(
+    tenant_id: str,
+    app_id: str,
+    app_secret: str,
+    resource_scope: str,
+    timeout: float,
+    proxy: Optional[HTTPProxyConfig],
+) -> str:
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
 
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
@@ -81,13 +113,23 @@ def get_access_token(tenant_id, app_id, app_secret, resource_scope, proxy, timeo
 
     try:
         api_response = requests.post(
-            token_url, headers=headers, data=body, proxies=proxy.to_requests_proxies(), timeout=timeout
+            token_url,
+            headers=headers,
+            data=body,
+            timeout=timeout,
+            proxies=proxy.to_requests_proxies(),
         )
         api_response.raise_for_status()
+    except requests.exceptions.Timeout as err:
+        handle_error(
+            err,
+            f"Timeout while getting access token ({int(timeout)}s).",
+            11,
+        )
     except requests.exceptions.RequestException as err:
-        sys.stderr.write("CRITICAL | Failed to get access token\n")
-        sys.stderr.write(f"Error: {err}\n")
-        sys.exit(1)
+        handle_error(
+            err, "Failed to get access token. Please check your connection configuration.", 1
+        )
 
     api_response_json = api_response.json()
     access_token = api_response_json["access_token"]
@@ -95,23 +137,39 @@ def get_access_token(tenant_id, app_id, app_secret, resource_scope, proxy, timeo
     return access_token
 
 
-def get_entra_sync(token, tenant_id, proxy, timeout):
+class EntraSyncStatus(TypedDict):
+    sync_enabled: Optional[bool]
+    sync_last: Optional[str]
+
+
+def get_entra_sync(
+    token: str, tenant_id: str, timeout: float, proxy: Optional[HTTPProxyConfig]
+) -> EntraSyncStatus:
     entra_sync_url = (
         f"https://graph.microsoft.com/v1.0/organization/{tenant_id}"
-        f"?$select=onPremisesLastSyncDateTime,onPremisesSyncEnabled"
+        "?$select=onPremisesLastSyncDateTime,onPremisesSyncEnabled"
     )
 
     headers = {"Authorization": "Bearer " + token}
 
     try:
         entra_sync_response = requests.get(
-            entra_sync_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout
+            entra_sync_url, headers=headers, timeout=timeout, proxies=proxy.to_requests_proxies()
         )
         entra_sync_response.raise_for_status()
+    except requests.exceptions.Timeout as err:
+        handle_error(
+            err,
+            f"Timeout while getting Entra connect/cloud sync ({int(timeout)}s).",
+            12,
+        )
     except requests.exceptions.RequestException as err:
-        sys.stderr.write("CRITICAL | Failed to get entra connect sync\n")
-        sys.stderr.write(f"Error: {err}\n")
-        sys.exit(2)
+        handle_error(
+            err,
+            "Failed to get Entra connect sync information. Please check your application "
+            "permissions.",
+            2,
+        )
 
     entra_sync_json = entra_sync_response.json()
 
@@ -123,7 +181,24 @@ def get_entra_sync(token, tenant_id, proxy, timeout):
     return entra_sync
 
 
-def get_entra_app_registration_creds(token, proxy, timeout):
+class AppCred(TypedDict):
+    cred_id: str
+    cred_name: Optional[str]
+    cred_expiration: str
+
+
+class AppRegistration(TypedDict):
+    app_name: str
+    app_appid: str
+    app_id: str
+    app_notes: Optional[str]
+    cred_type: str
+    app_creds: List[AppCred]
+
+
+def get_entra_app_registration_creds(
+    token: str, timeout: float, proxy: Optional[HTTPProxyConfig]
+) -> List[AppRegistration]:
     entra_app_registrations_url = (
         "https://graph.microsoft.com/v1.0/applications"
         "?$select=appId,id,notes,displayName,keyCredentials,passwordCredentials"
@@ -136,14 +211,24 @@ def get_entra_app_registration_creds(token, proxy, timeout):
     while True:
         try:
             entra_app_registration_response = requests.get(
-                entra_app_registrations_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout
+                entra_app_registrations_url,
+                headers=headers,
+                timeout=timeout,
+                proxies=proxy.to_requests_proxies(),
             )
             entra_app_registration_response.raise_for_status()
+        except requests.exceptions.Timeout as err:
+            handle_error(
+                err,
+                f"Timeout while getting Entra app registrations ({int(timeout)}s).",
+                13,
+            )
         except requests.exceptions.RequestException as err:
-            print(entra_app_registration_response.text)
-            sys.stderr.write("CRITICAL | Failed to get entra app registrations\n")
-            sys.stderr.write(f"Error: {err}\n")
-            sys.exit(2)
+            handle_error(
+                err,
+                "Failed to get Entra app registrations. Please check your application permissions.",
+                3,
+            )
 
         entra_app_registration_json = entra_app_registration_response.json()
         entra_app_registrations.extend(entra_app_registration_json.get("value", []))
@@ -190,6 +275,7 @@ def get_entra_app_registration_creds(token, proxy, timeout):
                 "app_creds": app_secrets_list,
             }
             app_list.append(app_secret_dict)
+
         if app_certs:
             app_certs_list = []
             for cert in app_certs:
@@ -213,12 +299,25 @@ def get_entra_app_registration_creds(token, proxy, timeout):
     return app_list
 
 
-def get_entra_saml_certs(token, proxy, timeout):
-    # preferredTokenSigningKeyEndDateTime and preferredTokenSigningKeyThumbprint not available in v1.0 (2024-12-06)
+class SamlInfo(TypedDict):
+    app_appid: str
+    app_id: str
+    app_name: str
+    app_notes: Optional[str]
+    cert_expiration: str
+    cert_thumbprint: str
+
+
+def get_entra_saml_certs(
+    token: str, timeout: float, proxy: Optional[HTTPProxyConfig]
+) -> List[SamlInfo]:
+    # preferredTokenSigningKeyEndDateTime and preferredTokenSigningKeyThumbprint are not
+    # available in v1.0 (2024-12-06)
     entra_saml_certs_url = (
         "https://graph.microsoft.com/beta/servicePrincipals"
         "?$filter=preferredSingleSignOnMode eq 'saml' and accountEnabled eq true"
-        "&$select=appId,id,displayName,notes,preferredTokenSigningKeyEndDateTime,preferredTokenSigningKeyThumbprint"
+        "&$select=appId,id,displayName,notes,preferredTokenSigningKeyEndDateTime,"
+        "preferredTokenSigningKeyThumbprint"
     )
 
     headers = {"Authorization": "Bearer " + token}
@@ -228,14 +327,26 @@ def get_entra_saml_certs(token, proxy, timeout):
     while True:
         try:
             entra_saml_certs_response = requests.get(
-                entra_saml_certs_url, headers=headers, proxies=proxy.to_requests_proxies(), timeout=timeout
+                entra_saml_certs_url,
+                headers=headers,
+                timeout=timeout,
+                proxies=proxy.to_requests_proxies(),
             )
             entra_saml_certs_response.raise_for_status()
+        except requests.exceptions.Timeout as err:
+            handle_error(
+                err,
+                "Timeout while getting Entra service principals with SAML configured "
+                f"({int(timeout)}s).",
+                14,
+            )
         except requests.exceptions.RequestException as err:
-            print(entra_saml_certs_response.text)
-            sys.stderr.write("CRITICAL | Failed to get entra app registrations\n")
-            sys.stderr.write(f"Error: {err}\n")
-            sys.exit(2)
+            handle_error(
+                err,
+                "Failed to get Entra service principals with SAML configured. Please check your "
+                "application permissions.",
+                4,
+            )
 
         entra_saml_certs_json = entra_saml_certs_response.json()
         entra_saml_certs.extend(entra_saml_certs_json.get("value", []))
@@ -253,8 +364,8 @@ def get_entra_saml_certs(token, proxy, timeout):
             "app_id": app["id"],
             "app_name": app["displayName"],
             "app_notes": app["notes"],
-            "app_cert_expiration": app["preferredTokenSigningKeyEndDateTime"],
-            "app_cert_thumbprint": app["preferredTokenSigningKeyThumbprint"],
+            "cert_expiration": app["preferredTokenSigningKeyEndDateTime"],
+            "cert_thumbprint": app["preferredTokenSigningKeyThumbprint"],
         }
 
         app_list.append(app_dict)
@@ -277,22 +388,22 @@ def main():
 
     resource_scope = "https://graph.microsoft.com/.default"
 
-    token = get_access_token(tenant_id, app_id, app_secret, resource_scope, proxy, timeout)
+    token = get_access_token(tenant_id, app_id, app_secret, resource_scope, timeout, proxy)
 
     if "entra_sync" in services_to_monitor:
-        entra_sync = get_entra_sync(token, tenant_id, proxy, timeout)
+        entra_sync = get_entra_sync(token, tenant_id, timeout, proxy)
         if entra_sync:
             print("<<<ms_entra_sync:sep(0)>>>")
             print(json.dumps(entra_sync))
 
     if "entra_app_registration_creds" in services_to_monitor:
-        entra_app_registration_creds = get_entra_app_registration_creds(token, proxy, timeout)
+        entra_app_registration_creds = get_entra_app_registration_creds(token, timeout, proxy)
         if entra_app_registration_creds:
             print("<<<ms_entra_app_creds:sep(0)>>>")
             print(json.dumps(entra_app_registration_creds))
 
     if "entra_saml_certs" in services_to_monitor:
-        entra_saml_certs = get_entra_saml_certs(token, proxy, timeout)
+        entra_saml_certs = get_entra_saml_certs(token, timeout, proxy)
         if entra_saml_certs:
             print("<<<ms_entra_saml_certs:sep(0)>>>")
             print(json.dumps(entra_saml_certs))

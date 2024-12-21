@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
 # Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
 
@@ -18,11 +18,23 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+####################################################################################################
+# Checkmk check plugin for monitoring the sync status of Entra connect/cloud sync.
+# The plugin works with data from the Microsoft Entra Special Agent (ms_entra).
+
+# Example data from special agent:
+# <<<ms_entra_sync:sep(0)>>>
+# {
+#     "sync_enabled": true,
+#     "sync_last": "1970-01-01T01:00:00Z"
+# }
+
+
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from cmk.agent_based.v2 import (
     AgentSection,
@@ -39,24 +51,17 @@ from cmk.agent_based.v2 import (
 
 
 @dataclass(frozen=True)
-class LastSync:
-    sync_enabled: bool
-    sync_last: str
+class EntraSyncStatus:
+    sync_enabled: Optional[bool]
+    sync_last: Optional[str]
 
 
-Section = Sequence[LastSync]
-
-# Example data from special agent:
-# <<<ms_entra_sync:sep(0)>>>
-# {
-#     "sync_enabled": true,
-#     "sync_last": "2024-06-20T13:01:52Z"
-# }
+Section = EntraSyncStatus
 
 
 def parse_ms_entra_sync(string_table: StringTable) -> Section:
     parsed = json.loads(string_table[0][0])
-    return parsed
+    return EntraSyncStatus(**parsed)
 
 
 def discover_ms_entra_sync(section: Section) -> DiscoveryResult:
@@ -64,31 +69,34 @@ def discover_ms_entra_sync(section: Section) -> DiscoveryResult:
 
 
 def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckResult:
-    sync_enabled = section["sync_enabled"]
-
-    if sync_enabled is True:
-        sync_last = section["sync_last"]
-
-        params_levels_sync_period = params.get("sync_period")
-
-        sync_last_datetime = datetime.fromisoformat(sync_last)
-        sync_last_timestamp = sync_last_datetime.timestamp()
-
-        sync_last_timespan = datetime.now().timestamp() - sync_last_timestamp
-
-        yield from check_levels(
-            sync_last_timespan,
-            levels_upper=(params_levels_sync_period),
-            label="Last sync",
-            notice_only=False,
-            render_func=lambda x: "%s ago" % render.timespan(abs(x)),
-        )
-
-    else:
+    if section.sync_enabled is not True:
         yield Result(
             state=State.UNKNOWN,
             summary="Entra connect/cloud sync not active",
         )
+        return
+
+    params_levels_sync_period = params.get("sync_period")
+
+    # Last sync time and timespan calculation
+    sync_last_datetime = datetime.fromisoformat(section.sync_last)
+    sync_last_timestamp = sync_last_datetime.timestamp()
+    sync_last_timestamp_render = render.datetime(int(sync_last_timestamp))
+    sync_last_timespan = datetime.now().timestamp() - sync_last_timestamp
+
+    result_summary = f"Sync time: {sync_last_timestamp_render}"
+
+    yield from check_levels(
+        sync_last_timespan,
+        levels_upper=(params_levels_sync_period),
+        label="Last sync",
+        render_func=lambda x: f"{render.timespan(abs(x))} ago",
+    )
+
+    yield Result(
+        state=State.OK,
+        summary=result_summary,
+    )
 
 
 agent_section_ms_entra_sync = AgentSection(
