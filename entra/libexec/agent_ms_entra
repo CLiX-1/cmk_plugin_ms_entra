@@ -208,7 +208,7 @@ def get_entra_app_registration_creds(
 
     entra_app_registrations = []
 
-    while True:
+    while entra_app_registrations_url is not None:
         try:
             entra_app_registration_response = requests.get(
                 entra_app_registrations_url,
@@ -233,11 +233,8 @@ def get_entra_app_registration_creds(
         entra_app_registration_json = entra_app_registration_response.json()
         entra_app_registrations.extend(entra_app_registration_json.get("value", []))
 
-        next_link = entra_app_registration_json.get("@odata.nextLink")
-        if next_link:
-            entra_app_registrations_url = next_link
-        else:
-            break
+        # get next page if available (pagination)
+        entra_app_registrations_url = entra_app_registration_json.get("@odata.nextLink")
 
     app_names = set()
     app_list = []
@@ -324,7 +321,7 @@ def get_entra_saml_certs(
 
     entra_saml_certs = []
 
-    while True:
+    while entra_saml_certs_url is not None:
         try:
             entra_saml_certs_response = requests.get(
                 entra_saml_certs_url,
@@ -351,11 +348,8 @@ def get_entra_saml_certs(
         entra_saml_certs_json = entra_saml_certs_response.json()
         entra_saml_certs.extend(entra_saml_certs_json.get("value", []))
 
-        next_link = entra_saml_certs_json.get("@odata.nextLink")
-        if next_link:
-            entra_saml_certs_url = next_link
-        else:
-            break
+        # get next page if available (pagination)
+        entra_saml_certs_url = entra_saml_certs_json.get("@odata.nextLink")
 
     app_list = []
     for app in entra_saml_certs:
