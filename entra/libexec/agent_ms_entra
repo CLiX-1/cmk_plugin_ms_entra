@@ -82,13 +82,13 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def handle_error(err: Exception, context: str = "", exit_code: int = 1) -> None:
-    if err.response and err.response.text:
-        sys.stderr.write(
-            f"{err}\n\nResponse: {getattr(err.response, 'text', '---')}\n\n{context}\n"
-        )
-    else:
-        sys.stderr.write(f"{err}\n\n{context}\n")
+def handle_error(err: Exception, context: str, exit_code: int = 1) -> None:
+    err_msg = f"{err}"
+    if getattr(err, "response", None) and err.response.text:
+        err_msg += f"Response: {err.response.text}"
+
+    sys.stderr.write(f"{err_msg}\n\n{context}\n")
+
     sys.exit(exit_code)
 
 
@@ -243,8 +243,8 @@ def get_entra_app_registration_creds(
         app_appid = app["appId"]
         app_id = app["id"]
         app_notes = app["notes"]
-        app_secrets = app.get("passwordCredentials")
-        app_certs = app.get("keyCredentials")
+        app_secrets = app.get("passwordCredentials", [])
+        app_certs = app.get("keyCredentials", [])
 
         # generate unique names, because entra app name is not unique
         if app_name in app_names and (app_secrets or app_certs):
@@ -253,45 +253,27 @@ def get_entra_app_registration_creds(
             app_name_unique = app_name
             app_names.add(app_name)
 
-        if app_secrets:
-            app_secrets_list = []
-            for secret in app_secrets:
-                app_secret_details = {
-                    "cred_id": secret["keyId"],
-                    "cred_name": secret["displayName"],
-                    "cred_expiration": secret["endDateTime"],
-                }
-                app_secrets_list.append(app_secret_details)
+        for cred_type, creds in [("secret", app_secrets), ("certificate", app_certs)]:
+            if creds:
+                app_creds_list = [
+                    {
+                        "cred_id": cred["keyId"],
+                        "cred_name": cred["displayName"],
+                        "cred_expiration": cred["endDateTime"],
+                    }
+                    for cred in creds
+                ]
 
-            app_secret_dict = {
-                "app_name": app_name_unique,
-                "app_appid": app_appid,
-                "app_id": app_id,
-                "app_notes": app_notes,
-                "cred_type": "secret",
-                "app_creds": app_secrets_list,
-            }
-            app_list.append(app_secret_dict)
-
-        if app_certs:
-            app_certs_list = []
-            for cert in app_certs:
-                app_cert_details = {
-                    "cred_id": cert["keyId"],
-                    "cred_name": cert["displayName"],
-                    "cred_expiration": cert["endDateTime"],
-                }
-                app_certs_list.append(app_cert_details)
-
-            app_secret_dict = {
-                "app_name": app_name_unique,
-                "app_appid": app_appid,
-                "app_id": app_id,
-                "app_notes": app_notes,
-                "cred_type": "certificate",
-                "app_creds": app_certs_list,
-            }
-            app_list.append(app_secret_dict)
+                app_list.append(
+                    {
+                        "app_name": app_name_unique,
+                        "app_appid": app_appid,
+                        "app_id": app_id,
+                        "app_notes": app_notes,
+                        "cred_type": cred_type,
+                        "app_creds": app_creds_list,
+                    }
+                )
 
     return app_list
 
