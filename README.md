@@ -15,7 +15,7 @@ The Plugin provides monitoring of these components:
 This Special Agent uses the Microsoft Graph API to collect the monitoring data.
 To access the API, you need a Microsoft Entra Tenant and a Microsoft Entra App Registration with a secret.
 
-You need at least these API **application** permissions for your App Registration:
+You need at least these API **application** permissions for your App Registration to use all the checks:
 - *Application.Read.All*
 - *Organization.Read.All*
 
