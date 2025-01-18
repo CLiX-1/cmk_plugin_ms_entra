@@ -15,7 +15,7 @@ The Plugin provides monitoring of these components:
 This Special Agent uses the Microsoft Graph API to collect the monitoring data.
 To access the API, you need a Microsoft Entra Tenant and a Microsoft Entra App Registration with a secret.
 
-You need at least these API **application** permissions for your App Registration:
+You need at least these API **application** permissions for your App Registration to use all the checks:
 - *Application.Read.All*
 - *Organization.Read.All*
 
@@ -136,7 +136,7 @@ You must also have a host in Checkmk and configure the Special Agent rule for th
 
 #### Add Special Agent Rule
 
-1. Navigate to the Special Agent rule **Setup** > **Microsoft 365** (use the search bar)
+1. Navigate to the Special Agent rule **Setup** > **Microsoft Entra** (use the search bar)
 2. Add a new rule and configure the required settings
 - **Application (client) ID** and **Directory (tenant) ID** from the Microsoft Entra Application
 - For **Client secret** select **From password store** and the password from **Add a New Password**
