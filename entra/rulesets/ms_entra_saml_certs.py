@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
-# Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
+# Copyright (C) 2025  Christopher Pommer <cp.software@outlook.de>
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -41,7 +41,7 @@ def _parameter_form_ms_entra_saml_certs() -> Dictionary:
         title=Title("Microsoft Entra SAML App Certificates"),
         help_text=Help(
             "Parameters for the expiration time thresholds from Microsoft Entra SAML app "
-            "certificates. To use this service, you need to set up the <b>Microsoft Entra</b> "
+            "certificates.<br>To use this service, you need to set up the <b>Microsoft Entra</b> "
             "special agent."
         ),
         elements={
@@ -50,8 +50,8 @@ def _parameter_form_ms_entra_saml_certs() -> Dictionary:
                     title=Title("Certificate expiration"),
                     help_text=Help(
                         "Specify the lower levels for the Microsoft Entra SAML app certificate "
-                        "expiration time. The default values are 14 days (WARN) and 5 days (CRIT). "
-                        "To ignore the certificate expiration, select 'No levels'."
+                        "expiration time.<br>The default values are 14 days (WARN) and 5 days "
+                        "(CRIT). To ignore the certificate expiration, select 'No levels'."
                     ),
                     form_spec_template=TimeSpan(
                         displayed_magnitudes=[

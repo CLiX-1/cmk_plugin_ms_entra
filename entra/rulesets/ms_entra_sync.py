@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
-# Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
+# Copyright (C) 2025  Christopher Pommer <cp.software@outlook.de>
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -41,7 +41,7 @@ def _parameter_form_ms_entra_sync() -> Dictionary:
         title=Title("Microsoft Entra Connect/Cloud Sync"),
         help_text=Help(
             "Parameters for the last sync time thresholds from the Microsoft Entra connect/cloud "
-            "sync. To use this service, you need to set up the <b>Microsoft Entra</b> special "
+            "sync.<br>To use this service, you need to set up the <b>Microsoft Entra</b> special "
             "agent."
         ),
         elements={
@@ -50,7 +50,7 @@ def _parameter_form_ms_entra_sync() -> Dictionary:
                     title=Title("Time since last sync"),
                     help_text=Help(
                         "Specify the upper levels for the last sync time from Microsoft Entra "
-                        "connect/cloud sync. The default values are 1 hour (WARN) and 3 hours "
+                        "connect/cloud sync.<br>The default values are 1 hour (WARN) and 3 hours "
                         "(CRIT). To ignore the last sync time, select 'No levels'."
                     ),
                     form_spec_template=TimeSpan(
