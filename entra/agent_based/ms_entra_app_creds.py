@@ -116,17 +116,6 @@ def discover_ms_entra_app_creds(section: Section) -> DiscoveryResult:
         yield Service(item=group)
 
 
-def get_cred_with_earliest_expiration(app_creds):
-    cred_earliest_expiration = app_creds[0]
-    for cred in app_creds:
-        if (
-            cred["cred_expiration_timestamp"]
-            < cred_earliest_expiration["cred_expiration_timestamp"]
-        ):
-            cred_earliest_expiration = cred
-    return cred_earliest_expiration
-
-
 def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Section) -> CheckResult:
     app = section.get(item)
     if not app:
@@ -138,77 +127,74 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
 
     cred_type = app.cred_type.capitalize()
 
-    credentials = []
     result_details_list = []
+    cred_earliest_expiration = None
     for cred in app.app_creds:
         cred_name = cred.get("cred_name") or ""
+        cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
+        cred_expiration_timestamp = cred_expiration_datetime.timestamp()
+        cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
 
-        cred_excluded = False
-        for pattern in compiled_patterns:
-            if pattern.match(cred_name):
-                cred_excluded = True
-                break
+        cred_id = cred["cred_id"]
+        cred_details = (f"{cred_type} ({cred_name})" if cred_name else f"{cred_type}") + (
+            f"\n - ID: {cred_id}\n - Expiration time: {cred_expiration_timestamp_render}"
+        )
+        result_details_list.append(cred_details)
 
-        if not cred_excluded:
-            cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
-            cred_expiration_timestamp = cred_expiration_datetime.timestamp()
-            cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
+        if any(pattern.match(cred_name) for pattern in compiled_patterns):
+            continue
 
-            cred_id = cred["cred_id"]
-            cred_details = (
-                f"{cred_type} ({cred_name})"
-                f"\n - ID: {cred_id}"
-                f"\n - Expiration time: {cred_expiration_timestamp_render}"
-            )
-            result_details_list.append(cred_details)
-
-            credential_dict = {
+        if (
+            cred_earliest_expiration is None
+            or cred_expiration_timestamp < cred_earliest_expiration["cred_expiration_timestamp"]
+        ):
+            cred_earliest_expiration = {
                 "cred_expiration_timestamp": cred_expiration_timestamp,
                 "cred_id": cred_id,
                 "cred_name": cred_name,
             }
-            credentials.append(credential_dict)
-
-    if not credentials:
-        return
 
     result_details = (
         f"App name: {app.app_name}\nApp ID: {app.app_appid}\nObject ID: {app.app_id}"
         "\n\nDescription: "
-    )
-    result_details += f"{app.app_notes}" if app.app_notes else "---"
-    result_details += f"\n\n{'\n\n'.join(result_details_list)}"
-
-    # Credential with earliest expiration time and timespan calculation
-    cred_earliest_expiration = get_cred_with_earliest_expiration(credentials)
-    cred_earliest_expiration_name = cred_earliest_expiration["cred_name"]
-    cred_earliest_expiration_timestamp = int(cred_earliest_expiration["cred_expiration_timestamp"])
-    cred_earliest_expiration_timestamp_render = render.datetime(cred_earliest_expiration_timestamp)
-    cred_expiration_timespan = cred_earliest_expiration_timestamp - datetime.now().timestamp()
-
-    result_summary = f"Expiration time: {cred_earliest_expiration_timestamp_render}"
-    result_summary += (
-        f", Name: {cred_earliest_expiration_name}"
-        if cred_earliest_expiration_name is not None
-        else ""
+        + (f"{app.app_notes}" if app.app_notes else "---")
+        + f"\n\n{'\n\n'.join(result_details_list)}"
     )
 
-    params_cred_expiration_levels = params.get("cred_expiration")
-
-    if cred_expiration_timespan > 0:
-        yield from check_levels(
-            cred_expiration_timespan,
-            levels_lower=(params_cred_expiration_levels),
-            label="Remaining",
-            render_func=render.timespan,
+    if cred_earliest_expiration is not None:
+        cred_earliest_expiration_name = cred_earliest_expiration["cred_name"]
+        cred_earliest_expiration_timestamp = int(
+            cred_earliest_expiration["cred_expiration_timestamp"]
         )
+        cred_earliest_expiration_timestamp_render = render.datetime(
+            cred_earliest_expiration_timestamp
+        )
+        cred_expiration_timespan = cred_earliest_expiration_timestamp - datetime.now().timestamp()
+
+        result_summary = f"Expiration time: {cred_earliest_expiration_timestamp_render}"
+        result_summary += (
+            f", Name: {cred_earliest_expiration_name}" if cred_earliest_expiration_name else ""
+        )
+
+        params_cred_expiration_levels = params.get("cred_expiration")
+
+        if cred_expiration_timespan > 0:
+            yield from check_levels(
+                cred_expiration_timespan,
+                levels_lower=(params_cred_expiration_levels),
+                label="Remaining",
+                render_func=render.timespan,
+            )
+        else:
+            yield from check_levels(
+                cred_expiration_timespan,
+                levels_lower=(params_cred_expiration_levels),
+                label="Expired",
+                render_func=lambda x: f"{render.timespan(abs(x))} ago",
+            )
+
     else:
-        yield from check_levels(
-            cred_expiration_timespan,
-            levels_lower=(params_cred_expiration_levels),
-            label="Expired",
-            render_func=lambda x: f"{render.timespan(abs(x))} ago",
-        )
+        result_summary = "All application credentials are excluded"
 
     yield Result(
         state=State.OK,
