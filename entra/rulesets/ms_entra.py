@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
-# Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
+# Copyright (C) 2025  Christopher Pommer <cp.software@outlook.de>
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -46,9 +46,9 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
         title=Title("Microsoft Entra"),
         help_text=Help(
             "This special agent requests data from Microsoft Entra using the Microsoft Graph API. "
-            "To monitor these resources, add this rule to a single host. You must configure a "
+            "To monitor these resources, add this rule to a single host.<br>You must configure a "
             "Microsoft Entra app registration. For the required permissions, see the help sections "
-            "under <b>Microsoft Entra services to monitor</b>. You may also want to adjust "
+            "under <b>Microsoft Entra services to monitor</b>.<br>You may also want to adjust "
             "the query interval with the rule <b>Normal check interval for service checks</b>."
         ),
         elements={
@@ -121,13 +121,14 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                 parameter_form=MultipleChoice(
                     title=Title("Microsoft Entra services to monitor"),
                     help_text=Help(
-                        "Select the Microsoft Entra services that you want to monitor. Ensure "
+                        "Select the Microsoft Entra services that you want to monitor.<br>Ensure "
                         "that you add the required Microsoft Graph API permissions to your "
-                        "Microsoft Entra app registration and grant admin consent to them."
+                        "Microsoft Entra app registration and grant admin consent to them.<br>"
                         "For Entra connnect/cloud sync, you must configure at least the "
-                        "<tt>Organization.Read.All</tt> API application permission. For Entra app "
-                        "registration credentials and Entra SAML certificates, you must configure "
-                        "at least the <tt>Application.Read.All</tt> API application permission."
+                        "<tt>Organization.Read.All</tt> API application permission.<br>For Entra "
+                        "app registration credentials and Entra SAML certificates, you must "
+                        "configureat least the <tt>Application.Read.All</tt> API application "
+                        "permission."
                     ),
                     elements=[
                         MultipleChoiceElement(
@@ -167,7 +168,7 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                     help_text=Help(
                         "Define a custom timeout in seconds to use for each API request. The "
                         "timeout is used for token request and any service that should be "
-                        "monitored. The default timeout is 10s."
+                        "monitored.<br>The default timeout is 10s."
                     ),
                     displayed_magnitudes=[TimeMagnitude.SECOND],
                     prefill=InputHint(10.0),

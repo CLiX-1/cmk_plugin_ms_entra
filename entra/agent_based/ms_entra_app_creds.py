@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8; py-indent-offset: 4; max-line-length: 100 -*-
 
-# Copyright (C) 2024  Christopher Pommer <cp.software@outlook.de>
+# Copyright (C) 2025  Christopher Pommer <cp.software@outlook.de>
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -64,6 +64,7 @@
 
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -131,30 +132,45 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
     if not app:
         return
 
-    params_levels_cred_expiration = params.get("cred_expiration")
+    params_cred_exclude_list = params.get("cred_exclude")
+
+    compiled_patterns = [re.compile(pattern) for pattern in params_cred_exclude_list]
 
     cred_type = app.cred_type.capitalize()
 
     credentials = []
     result_details_list = []
     for cred in app.app_creds:
-        cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
-        cred_expiration_timestamp = cred_expiration_datetime.timestamp()
-        cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
+        cred_name = cred.get("cred_name") or ""
 
-        cred_details = f"{cred_type}"
-        cred_details += f" ({cred["cred_name"]})" if cred["cred_name"] else ""
-        cred_details += (
-            f"\n - ID: {cred["cred_id"]}\n - Expiration time: {cred_expiration_timestamp_render}"
-        )
-        result_details_list.append(cred_details)
+        cred_excluded = False
+        for pattern in compiled_patterns:
+            if pattern.match(cred_name):
+                cred_excluded = True
+                break
 
-        credential_dict = {
-            "cred_expiration_timestamp": cred_expiration_timestamp,
-            "cred_id": cred["cred_id"],
-            "cred_name": cred["cred_name"],
-        }
-        credentials.append(credential_dict)
+        if not cred_excluded:
+            cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
+            cred_expiration_timestamp = cred_expiration_datetime.timestamp()
+            cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
+
+            cred_id = cred["cred_id"]
+            cred_details = (
+                f"{cred_type} ({cred_name})"
+                f"\n - ID: {cred_id}"
+                f"\n - Expiration time: {cred_expiration_timestamp_render}"
+            )
+            result_details_list.append(cred_details)
+
+            credential_dict = {
+                "cred_expiration_timestamp": cred_expiration_timestamp,
+                "cred_id": cred_id,
+                "cred_name": cred_name,
+            }
+            credentials.append(credential_dict)
+
+    if not credentials:
+        return
 
     result_details = (
         f"App name: {app.app_name}\nApp ID: {app.app_appid}\nObject ID: {app.app_id}"
@@ -177,17 +193,19 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
         else ""
     )
 
+    params_cred_expiration_levels = params.get("cred_expiration")
+
     if cred_expiration_timespan > 0:
         yield from check_levels(
             cred_expiration_timespan,
-            levels_lower=(params_levels_cred_expiration),
+            levels_lower=(params_cred_expiration_levels),
             label="Remaining",
             render_func=render.timespan,
         )
     else:
         yield from check_levels(
             cred_expiration_timespan,
-            levels_lower=(params_levels_cred_expiration),
+            levels_lower=(params_cred_expiration_levels),
             label="Expired",
             render_func=lambda x: f"{render.timespan(abs(x))} ago",
         )
