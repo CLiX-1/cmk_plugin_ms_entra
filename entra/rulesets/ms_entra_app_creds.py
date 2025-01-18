@@ -71,14 +71,14 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
                 parameter_form=List[str](
                     title=Title("Exclude credentials"),
                     help_text=Help(
-                        "Specify a list of credential names that you do not want to monitor.<br>"
-                        'For example, "CWAP_AuthSecret$" to ignore Microsoft Entra Application '
+                        "Specify a list of credential descriptions that you do not want to monitor."
+                        '<br>For example, "CWAP_AuthSecret$" to ignore Microsoft Entra Application '
                         'Proxy secrets or "CN=service.prod.powerva.microsoft.com$" to ignore '
                         "Microsoft Power Virtual Agents certificates. Keep in mind that Microsoft "
-                        "can change these names over time.<br><br>"
+                        "can change these descriptions over time.<br><br>"
                     ),
                     element_template=RegularExpression(
-                        title=Title("Credential name"),
+                        title=Title("Credential description"),
                         predefined_help_text=MatchingScope.PREFIX,
                         custom_validate=(LengthInRange(min_value=1),),
                     ),
