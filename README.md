@@ -59,6 +59,7 @@ This check monitors the expiration time of secrets and certificates from Entra a
 #### Checkmk Parameters
 
 1. **Credential expiration**: Specify the lower levels for the Microsoft Entra app credential expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the credential expiration, select 'No levels'.
+2. **Exclude credentials**: Specify a list of credential descriptions that you do not want to monitor.
 
 #### Microsoft Graph API
 
