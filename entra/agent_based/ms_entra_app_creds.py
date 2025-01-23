@@ -121,7 +121,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
     if not app:
         return
 
-    params_cred_exclude_list = params.get("cred_exclude")
+    params_cred_exclude_list = params.get("cred_exclude", [])
 
     compiled_patterns = [re.compile(pattern) for pattern in params_cred_exclude_list]
 
