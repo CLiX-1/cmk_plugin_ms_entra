@@ -184,6 +184,7 @@ def get_entra_sync(
 class AppCred(TypedDict):
     cred_id: str
     cred_name: Optional[str]
+    cred_identifier: Optional[str]
     cred_expiration: str
 
 
@@ -259,6 +260,7 @@ def get_entra_app_registration_creds(
                     {
                         "cred_id": cred["keyId"],
                         "cred_name": cred["displayName"],
+                        "cred_identifier": cred["customKeyIdentifier"],
                         "cred_expiration": cred["endDateTime"],
                     }
                     for cred in creds

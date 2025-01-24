@@ -62,7 +62,7 @@
 #   ...
 # ]
 
-
+import base64
 import json
 import re
 from collections.abc import Mapping
@@ -87,6 +87,7 @@ from cmk.agent_based.v2 import (
 class AppCred(TypedDict):
     cred_id: str
     cred_name: Optional[str]
+    cred_identifier: Optional[str]
     cred_expiration: str
 
 
@@ -130,18 +131,27 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
     result_details_list = []
     cred_earliest_expiration = None
     for cred in app.app_creds:
-        cred_name = cred.get("cred_name") or ""
+        cred_name = cred.get("cred_name")
+        cred_identifier = cred.get("cred_identifier")
+
+        if cred_name:
+            cred_description = cred_name
+        elif cred_identifier:
+            cred_description = base64.b64decode(cred_identifier).decode("utf-8", errors="ignore")
+        else:
+            cred_description = ""
+
         cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
         cred_expiration_timestamp = cred_expiration_datetime.timestamp()
         cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
 
         cred_id = cred["cred_id"]
-        cred_details = (f"{cred_type} ({cred_name})" if cred_name else f"{cred_type}") + (
-            f"\n - ID: {cred_id}\n - Expiration time: {cred_expiration_timestamp_render}"
-        )
+        cred_details = (
+            f"{cred_type} ({cred_description})" if cred_description else f"{cred_type}"
+        ) + (f"\n - ID: {cred_id}\n - Expiration time: {cred_expiration_timestamp_render}")
         result_details_list.append(cred_details)
 
-        if any(pattern.match(cred_name) for pattern in compiled_patterns):
+        if any(pattern.match(cred_description) for pattern in compiled_patterns):
             continue
 
         if (
@@ -151,7 +161,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
             cred_earliest_expiration = {
                 "cred_expiration_timestamp": cred_expiration_timestamp,
                 "cred_id": cred_id,
-                "cred_name": cred_name,
+                "cred_description": cred_description,
             }
 
     result_details = (
@@ -162,7 +172,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
     )
 
     if cred_earliest_expiration is not None:
-        cred_earliest_expiration_name = cred_earliest_expiration["cred_name"]
+        cred_earliest_expiration_name = cred_earliest_expiration["cred_description"]
         cred_earliest_expiration_timestamp = int(
             cred_earliest_expiration["cred_expiration_timestamp"]
         )
@@ -173,7 +183,9 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
 
         result_summary = f"Expiration time: {cred_earliest_expiration_timestamp_render}"
         result_summary += (
-            f", Name: {cred_earliest_expiration_name}" if cred_earliest_expiration_name else ""
+            f", Description: {cred_earliest_expiration_name}"
+            if cred_earliest_expiration_name
+            else ""
         )
 
         params_cred_expiration_levels = params.get("cred_expiration")
