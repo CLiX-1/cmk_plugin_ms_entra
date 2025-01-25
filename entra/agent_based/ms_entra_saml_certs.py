@@ -111,27 +111,30 @@ def check_ms_entra_saml_certs(
     params_levels_cert_expiration = params.get("cert_expiration")
 
     # Cert expiration time and timespan calculation
-    cert_expiration_datetime = datetime.fromisoformat(app.cert_expiration)
-    cert_expiration_timestamp = cert_expiration_datetime.timestamp()
+    cert_expiration_timestamp = datetime.fromisoformat(app.cert_expiration).timestamp()
     cert_expiration_timestamp_render = render.datetime(int(cert_expiration_timestamp))
     cert_expiration_timespan = cert_expiration_timestamp - datetime.now().timestamp()
 
-    # Build result details
-    details = [
+    # This content will be used to display the application details in the check result details with
+    # the available SAML certificate.
+    app_details_list = [
         f"App name: {app.app_name}",
         f"App ID: {app.app_appid}",
         f"Object ID: {app.app_id}",
         "",
-        f"Description: {app.app_notes or '---'}",
+        f"Description: {app.app_notes or '(Not available)'}",
         "",
         "Certificate",
         f" - Thumbprint: {app.cert_thumbprint}",
         f" - Expiration time: {cert_expiration_timestamp_render}",
     ]
-    result_details = "\n".join(details)
+    result_details = "\n".join(app_details_list)
 
+    # This content will be used as the check result summary.
     result_summary = f"Expiration time: {cert_expiration_timestamp_render}"
 
+    # For state calculation, check_levels is used.
+    # It will take the expiration time of the SAML certificate.
     if cert_expiration_timespan > 0:
         yield from check_levels(
             cert_expiration_timespan,
@@ -147,6 +150,8 @@ def check_ms_entra_saml_certs(
             render_func=lambda x: "%s ago" % render.timespan(abs(x)),
         )
 
+    # To display custom summary and details we need to yield Result.
+    # The real state is calculated by check_levels.
     yield Result(
         state=State.OK,
         summary=result_summary,

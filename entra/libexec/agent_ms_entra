@@ -171,11 +171,11 @@ def get_entra_sync(
             2,
         )
 
-    entra_sync_json = entra_sync_response.json()
+    entra_sync_dict = entra_sync_response.json()
 
     entra_sync = {
-        "sync_enabled": entra_sync_json["onPremisesSyncEnabled"],
-        "sync_last": entra_sync_json["onPremisesLastSyncDateTime"],
+        "sync_enabled": entra_sync_dict["onPremisesSyncEnabled"],
+        "sync_last": entra_sync_dict["onPremisesLastSyncDateTime"],
     }
 
     return entra_sync
@@ -230,12 +230,11 @@ def get_entra_app_registration_creds(
                 "Failed to get Entra app registrations. Please check your application permissions.",
                 3,
             )
-
-        entra_app_registration_json = entra_app_registration_response.json()
-        entra_app_registrations.extend(entra_app_registration_json.get("value", []))
+        entra_app_registration_dict = entra_app_registration_response.json()
+        entra_app_registrations.extend(entra_app_registration_dict.get("value", []))
 
         # get next page if available (pagination)
-        entra_app_registrations_url = entra_app_registration_json.get("@odata.nextLink")
+        entra_app_registrations_url = entra_app_registration_dict.get("@odata.nextLink")
 
     app_names = set()
     app_list = []
@@ -329,11 +328,11 @@ def get_entra_saml_certs(
                 4,
             )
 
-        entra_saml_certs_json = entra_saml_certs_response.json()
-        entra_saml_certs.extend(entra_saml_certs_json.get("value", []))
+        entra_saml_certs_dict = entra_saml_certs_response.json()
+        entra_saml_certs.extend(entra_saml_certs_dict.get("value", []))
 
         # get next page if available (pagination)
-        entra_saml_certs_url = entra_saml_certs_json.get("@odata.nextLink")
+        entra_saml_certs_url = entra_saml_certs_dict.get("@odata.nextLink")
 
     app_list = []
     for app in entra_saml_certs:

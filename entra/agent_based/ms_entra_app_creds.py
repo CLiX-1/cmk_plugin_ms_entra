@@ -19,7 +19,7 @@
 
 
 ####################################################################################################
-# Checkmk check plugin for monitoring the expiration of secrests and certificates from
+# Checkmk check plugin for monitoring the expiration of secrets and certificates from
 # Microsoft Entra App Registrations.
 # The plugin works with data from the Microsoft Entra Special Agent (ms_entra).
 
@@ -36,6 +36,7 @@
 #       {
 #         "cred_id": "00000000-0000-0000-0000-000000000000",
 #         "cred_name": "Cert Name 1",
+#         "cred_identifier": 239527ECF41F3FCFADBF68F93689FD4EBE19A3B0,
 #         "cred_expiration": "1970-01-01T01:00:00Z"
 #       }
 #     ]
@@ -49,12 +50,14 @@
 #     "app_creds": [
 #       {
 #         "cred_id": "00000000-0000-0000-0000-000000000000",
-#         "cred_name": "Secret Name 1",
+#         "cred_name": null",
+#         "cred_identifier": "Q1dBUF9BdXRoU2VjcmV0",
 #         "cred_expiration": "1970-01-01T01:00:00Z"
 #       },
 #       {
 #         "cred_id": "00000000-0000-0000-0000-000000000000",
 #         "cred_name": "Secret Name 2",
+#         "cred_identifier": null,
 #         "cred_expiration": "1970-01-01T01:00:00Z"
 #       }
 #     ]
@@ -126,35 +129,36 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
 
     compiled_patterns = [re.compile(pattern) for pattern in params_cred_exclude_list]
 
+    # The type of the credentials is capitalized for the check result details.
     cred_type = app.cred_type.capitalize()
 
-    result_details_list = []
+    result_details_cred_list = []
     cred_earliest_expiration = None
     for cred in app.app_creds:
-        cred_name = cred.get("cred_name")
-        cred_identifier = cred.get("cred_identifier")
+        cred_description = cred["cred_name"] or ""
+        cred_identifier = cred["cred_identifier"]
 
-        if cred_name:
-            cred_description = cred_name
-        elif cred_identifier:
-            cred_description = base64.b64decode(cred_identifier).decode("utf-8", errors="ignore")
-        else:
-            cred_description = ""
+        # It is possible that the credential displayName (cred_name) is not set, but the
+        # customKeyIdentifier (cred_identifier) is. For secrets, both values are used as
+        # the description. For certificates, only the displayName is used as the description.
+        # The customKeyIdentifier for certificates is usually the certificate thumbprint, but
+        # not always a valid one. The identifier is base64 encoded and will be decoded for
+        # secrets if possible, because sometimes it is not a valid base64 string. It also
+        # happens that both values are set or not. If both are set, the dsiplayName is used.
+        if not cred_description and cred_identifier and cred_type == "Secret":
+            try:
+                cred_description = base64.b64decode(cred_identifier).decode("utf-8")
+            except (base64.binascii.Error, UnicodeDecodeError):
+                pass
 
-        cred_expiration_datetime = datetime.fromisoformat(cred["cred_expiration"])
-        cred_expiration_timestamp = cred_expiration_datetime.timestamp()
-        cred_expiration_timestamp_render = render.datetime(cred_expiration_timestamp)
+        cred_expiration_timestamp = datetime.fromisoformat(cred["cred_expiration"]).timestamp()
 
         cred_id = cred["cred_id"]
-        cred_details = (
-            f"{cred_type} ({cred_description})" if cred_description else f"{cred_type}"
-        ) + (f"\n - ID: {cred_id}\n - Expiration time: {cred_expiration_timestamp_render}")
-        result_details_list.append(cred_details)
 
-        if any(pattern.match(cred_description) for pattern in compiled_patterns):
-            continue
-
-        if (
+        # This is used to find the credential with the earliest expiration time.
+        # The expiration time of this credential will be used for the check result.
+        # Only credentials that are not excluded by a Checkmk rule are considered.
+        if not any(pattern.match(cred_description) for pattern in compiled_patterns) and (
             cred_earliest_expiration is None
             or cred_expiration_timestamp < cred_earliest_expiration["cred_expiration_timestamp"]
         ):
@@ -164,32 +168,47 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
                 "cred_description": cred_description,
             }
 
-    result_details = (
-        f"App name: {app.app_name}\nApp ID: {app.app_appid}\nObject ID: {app.app_id}"
-        "\n\nDescription: "
-        + (f"{app.app_notes}" if app.app_notes else "---")
-        + f"\n\n{'\n\n'.join(result_details_list)}"
-    )
+        # Build a list of credential details to be displayed in the check result details.
+        cred_details_list = [
+            f"{cred_type} ID: {cred_id}",
+            f" - Description: {cred_description or '(Not available)'}",
+            f" - Expiration time: {render.datetime(cred_expiration_timestamp)}",
+        ]
+        result_details_cred_list.append("\n".join(cred_details_list))
 
+    # This content will be used to display the application details in the check result details with
+    # all available credentials.
+    app_details_list = [
+        f"App name: {app.app_name}",
+        f"App ID: {app.app_appid}",
+        f"Object ID: {app.app_id}",
+        "",
+        f"Description: {app.app_notes or '(Not available)'}",
+    ]
+    result_details = "\n".join(app_details_list) + "\n\n" + "\n\n".join(result_details_cred_list)
+
+    # It will only be None, if all credentials are excluded by a Checkmk rule.
     if cred_earliest_expiration is not None:
-        cred_earliest_expiration_name = cred_earliest_expiration["cred_description"]
+        cred_earliest_expiration_description = cred_earliest_expiration["cred_description"]
         cred_earliest_expiration_timestamp = int(
             cred_earliest_expiration["cred_expiration_timestamp"]
         )
-        cred_earliest_expiration_timestamp_render = render.datetime(
-            cred_earliest_expiration_timestamp
-        )
+
+        # Calculate the timespan until the earliest credential expires or has expired.
         cred_expiration_timespan = cred_earliest_expiration_timestamp - datetime.now().timestamp()
 
-        result_summary = f"Expiration time: {cred_earliest_expiration_timestamp_render}"
+        # This content will be used as the check result summary.
+        result_summary = f"Expiration time: {render.datetime(cred_earliest_expiration_timestamp)}"
         result_summary += (
-            f", Description: {cred_earliest_expiration_name}"
-            if cred_earliest_expiration_name
+            f", Description: {cred_earliest_expiration_description}"
+            if cred_earliest_expiration_description
             else ""
         )
 
         params_cred_expiration_levels = params.get("cred_expiration")
 
+        # For state calculation, check_levels is used.
+        # It will take the expiration time of the credential with the earliest expiration time.
         if cred_expiration_timespan > 0:
             yield from check_levels(
                 cred_expiration_timespan,
@@ -208,6 +227,9 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
     else:
         result_summary = "All application credentials are excluded"
 
+    # To display custom summary and details we need to yield Result.
+    # The real state is calculated by check_levels.
+    # Also if all credentials are excluded, we need to yield Result with state OK.
     yield Result(
         state=State.OK,
         summary=result_summary,

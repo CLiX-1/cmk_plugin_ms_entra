@@ -69,6 +69,7 @@ def discover_ms_entra_sync(section: Section) -> DiscoveryResult:
 
 
 def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckResult:
+    # If sync is not enabled, the check will return UNKNOWN.
     if section.sync_enabled is not True:
         yield Result(
             state=State.UNKNOWN,
@@ -78,14 +79,15 @@ def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckRes
 
     params_levels_sync_period = params.get("sync_period")
 
-    # Last sync time and timespan calculation
-    sync_last_datetime = datetime.fromisoformat(section.sync_last)
-    sync_last_timestamp = sync_last_datetime.timestamp()
-    sync_last_timestamp_render = render.datetime(int(sync_last_timestamp))
+    # Calculation of the timespan since the last sync.
+    sync_last_timestamp = datetime.fromisoformat(section.sync_last).timestamp()
     sync_last_timespan = datetime.now().timestamp() - sync_last_timestamp
 
-    result_summary = f"Sync time: {sync_last_timestamp_render}"
+    # This content will be used as the check result summary.
+    result_summary = f"Sync time: {render.datetime(int(sync_last_timestamp))}"
 
+    # For state calculation, check_levels is used.
+    # It will take the last sync time of the Entra connect/cloud sync.
     yield from check_levels(
         sync_last_timespan,
         levels_upper=(params_levels_sync_period),
@@ -93,6 +95,8 @@ def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckRes
         render_func=lambda x: f"{render.timespan(abs(x))} ago",
     )
 
+    # To display custom summary we need to yield Result.
+    # The real state is calculated by check_levels.
     yield Result(
         state=State.OK,
         summary=result_summary,
