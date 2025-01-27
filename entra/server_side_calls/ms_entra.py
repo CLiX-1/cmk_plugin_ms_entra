@@ -65,7 +65,7 @@ def generate_special_agent_commands(
 
     if params.proxy:
         match params.proxy:
-            case URLProxy(url):
+            case URLProxy(url=url):
                 args += ["--proxy", url]
             case EnvProxy():
                 args += ["--proxy", "FROM_ENVIRONMENT"]
