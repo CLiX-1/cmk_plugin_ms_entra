@@ -53,7 +53,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--proxy",
-        required=False,
+        default=None,
         help=(
             "The HTTP proxy used to connect to the Microsoft Graph API. If not set, the "
             "environment settings will be used."
