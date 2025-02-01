@@ -297,7 +297,7 @@ def get_entra_saml_certs(
         "https://graph.microsoft.com/beta/servicePrincipals"
         "?$filter=preferredSingleSignOnMode eq 'saml' and accountEnabled eq true"
         "&$select=appId,id,displayName,notes,preferredTokenSigningKeyEndDateTime,"
-        "preferredTokenSigningKeyThumbprint"
+        "preferredTokenSigningKeyThumbprint,passwordCredentials"
     )
 
     headers = {"Authorization": "Bearer " + token}
@@ -341,7 +341,9 @@ def get_entra_saml_certs(
             "app_id": app["id"],
             "app_name": app["displayName"],
             "app_notes": app["notes"],
-            "cert_expiration": app["preferredTokenSigningKeyEndDateTime"],
+            "cert_expiration": app["preferredTokenSigningKeyEndDateTime"] \
+                if app["preferredTokenSigningKeyEndDateTime"] \
+                else app.get("passwordCredentials")[0].get("endDateTime"),
             "cert_thumbprint": app["preferredTokenSigningKeyThumbprint"],
         }
 
