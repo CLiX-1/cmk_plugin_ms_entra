@@ -148,7 +148,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
         if not cred_description and cred_identifier and cred_type == "Secret":
             try:
                 cred_description = base64.b64decode(cred_identifier).decode("utf-8")
-            except (base64.binascii.Error, UnicodeDecodeError):
+            except Exception:
                 pass
 
         cred_expiration_timestamp = datetime.fromisoformat(cred["cred_expiration"]).timestamp()
@@ -190,9 +190,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
     # It will only be None, if all credentials are excluded by a Checkmk rule.
     if cred_earliest_expiration is not None:
         cred_earliest_expiration_description = cred_earliest_expiration["cred_description"]
-        cred_earliest_expiration_timestamp = int(
-            cred_earliest_expiration["cred_expiration_timestamp"]
-        )
+        cred_earliest_expiration_timestamp = cred_earliest_expiration["cred_expiration_timestamp"]
 
         # Calculate the timespan until the earliest credential expires or has expired.
         cred_expiration_timespan = cred_earliest_expiration_timestamp - datetime.now().timestamp()
