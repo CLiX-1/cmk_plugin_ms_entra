@@ -103,14 +103,14 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
             ),
             "app_secret": DictElement(
                 parameter_form=Password(
-                    title=Title("Client secret"),
+                    title=Title("Client Secret"),
                     help_text=Help("The client secret from the Microsoft Entra app registration."),
                 ),
                 required=True,
             ),
             "proxy": DictElement(
                 parameter_form=Proxy(
-                    title=Title("HTTP proxy"),
+                    title=Title("HTTP Proxy"),
                     help_text=Help(
                         "The HTTP proxy used to connect to the Microsoft Graph API. If not set, "
                         "the environment settings will be used."
@@ -119,43 +119,48 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
             ),
             "services_to_monitor": DictElement(
                 parameter_form=MultipleChoice(
-                    title=Title("Microsoft Entra services to monitor"),
+                    title=Title("Microsoft Entra Services to monitor"),
                     help_text=Help(
-                        "Select the Microsoft Entra services that you want to monitor.<br>Ensure "
+                        "Select the Microsoft Entra services you want to monitor.<br>Ensure "
                         "that you add the required Microsoft Graph API permissions to your "
                         "Microsoft Entra app registration and grant admin consent to them.<br>"
-                        "For Entra connnect/cloud sync, you must configure at least the "
-                        "<tt>Organization.Read.All</tt> API application permission.<br>For Entra "
-                        "app registration credentials and Entra SAML certificates, you must "
-                        "configureat least the <tt>Application.Read.All</tt> API application "
-                        "permission."
+                        "For <b>Entra Connnect/Cloud Sync</b>, you must configure at least the "
+                        "<tt>Organization.Read.All</tt> API application permission.<br>For <b>"
+                        "Entra App Registration Credentials</b>, <b>Entra CA VPN Certificate</b> "
+                        "and <b>Entra SAML certificates</b>, you must configure at least the "
+                        "<tt>Application.Read.All</tt> API application permission."
                     ),
                     elements=[
                         MultipleChoiceElement(
-                            name="entra_sync",
-                            title=Title("Microsoft Entra connect/cloud sync"),
+                            name="entra_app_registration_creds",
+                            title=Title("Microsoft Entra App Registration Credentials"),
                         ),
                         MultipleChoiceElement(
-                            name="entra_app_registration_creds",
-                            title=Title("Microsoft Entra app registration credentials"),
+                            name="entra_ca_vpn_cert",
+                            title=Title("Microsoft Entra CA VPN Certificate"),
+                        ),
+                        MultipleChoiceElement(
+                            name="entra_sync",
+                            title=Title("Microsoft Entra Connect/Cloud Sync"),
                         ),
                         MultipleChoiceElement(
                             name="entra_saml_certs",
-                            title=Title("Microsoft Entra SAML certificates"),
+                            title=Title("Microsoft Entra SAML Certificates"),
                         ),
                     ],
                     custom_validate=[
                         LengthInRange(
                             min_value=1,
                             error_msg=Message(
-                                "Select one or more <b>Microsoft Entra services to monitor</b>"
+                                "Select one or more <b>Microsoft Entra Services to monitor</b>"
                             ),
                         ),
                     ],
                     prefill=DefaultValue(
                         [
-                            "entra_sync",
                             "entra_app_registration_creds",
+                            "entra_ca_vpn_cert",
+                            "entra_sync",
                             "entra_saml_certs",
                         ]
                     ),
@@ -164,14 +169,13 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
             ),
             "timeout": DictElement(
                 parameter_form=TimeSpan(
-                    title=Title("Timeout for each API request"),
+                    title=Title("Timeout for each API Request"),
                     help_text=Help(
                         "Define a custom timeout in seconds to use for each API request. The "
                         "timeout is used for token request and any service that should be "
                         "monitored.<br>The default timeout is 10s."
                     ),
                     displayed_magnitudes=[TimeMagnitude.SECOND],
-                    prefill=InputHint(10.0),
                     custom_validate=[
                         NumberInRange(
                             min_value=3,
@@ -179,6 +183,7 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                             error_msg=Message("The timeout must be between 3s and 600s."),
                         ),
                     ],
+                    prefill=InputHint(value=10.0),
                 ),
             ),
         },

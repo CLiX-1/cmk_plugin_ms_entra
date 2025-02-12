@@ -1,0 +1,17 @@
+title: Microsoft Entra: Conditional Access VPN Certificate
+agents: entra
+catalog: cloud/Microsoft
+license: GPLv2
+distribution: Christopher Pommer
+description:
+ This check monitors the expiration time of certificates
+ from the Entra Conditional Access VPN enterprise application
+ (service principal) with the name "VPN Server".
+
+ The levels {OK}, {WARN} and {CRIT} depends on the
+ configured check levels for the certificate expiration time.
+
+ You have to configure the special agent {Microsoft Entra}.
+
+discovery:
+ One service is created for the VPN Server enterprise application.
