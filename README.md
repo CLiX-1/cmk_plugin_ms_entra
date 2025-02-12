@@ -6,9 +6,10 @@ The Microsoft Entra Special Agent can be integrated into Checkmk 2.3 or newer.
 You can download the .mkp file from releases in this repository to upload it directly to your Checkmk site.
 
 The Plugin provides monitoring of these components:
-- Microsoft Entra connect/cloud sync
-- Microsoft Entra app registration credentials
-- Microsoft Entra SAML certificates
+- Microsoft Entra App Registration Credentials
+- Microsoft Entra CA VPN Certificate
+- Microsoft Entra Connect/Cloud Sync
+- Microsoft Entra SAML Certificates
 
 ## Prerequisites
 
@@ -26,54 +27,75 @@ You will need the Microsoft Entra Tenant ID, the Microsoft Entra App Registratio
 When you configure the Special Agent, you have the option to select only the services that you want to monitor. You do not have to implement all the checks, but at least one of them.
 
 ## Check Details
-### Microsoft Entra connect/cloud sync
 
-#### Description
-
-This check monitors the time since the last Entra connect/cloud synchronisation.
-
-#### Checkmk service example
-
-![grafik](https://github.com/user-attachments/assets/4194feb8-abf9-434d-ba53-ea367e9f9c51)
-
-#### Checkmk Parameters
-
-1. **Time since last sync**: Specify the upper levels for the last sync time from Microsoft Entra connect/cloud sync. The default values are 1 hour (WARN) and 3 hours (CRIT). To ignore the last sync time, select 'No levels'.
-
-#### Microsoft Graph API
-
-**API permissions**: At  least *Organization.Read.All* (Application permission)
-
-**Endpoint**: *https://graph.microsoft.com/v1.0/organization/{organizationId}*
-
-### Microsoft Entra app registration credentials
+### Microsoft Entra App Registration Credentials
 
 #### Description
 
 This check monitors the expiration time of secrets and certificates from Entra app registrations.
 
-#### Checkmk service example
+#### Checkmk Service Example
 
 ![grafik](https://github.com/user-attachments/assets/72493199-730c-4dbf-8d4d-d09e8e343ff4)
 
 #### Checkmk Parameters
 
-1. **Credential expiration**: Specify the lower levels for the Microsoft Entra app credential expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the credential expiration, select 'No levels'.
-2. **Exclude credentials**: Specify a list of credential descriptions that you do not want to monitor.
+1. **Credential Expiration**: Specify the lower levels for the Microsoft Entra app credential expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the credential expiration, select 'No levels'.
+2. **Exclude Credentials**: Specify a list of credential descriptions that you do not want to monitor.
 
 #### Microsoft Graph API
 
-**API permissions**: At  least *Application.Read.All* (Application permission)
+**API Permissions**: At least *Application.Read.All* (Application permission)
 
 **Endpoint**: *https://graph.microsoft.com/v1.0/applications*
+<br><br>
+### Microsoft Entra CA VPN Certificates
 
-### Microsoft Entra SAML certificates
+#### Description
+
+This check monitors the expiration time of the Entra Conditional Access VPN certificate.
+
+#### Checkmk Service Example
+
+![grafik](https://github.com/user-attachments/assets/535a3a57-1290-4c17-b567-a34c7c5d8bd3)
+
+#### Checkmk Parameters
+
+1. **Certificate Expiration**: Specify the lower levels for the Microsoft Entra Conditional Access VPN certificate expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the certificate expiration, select 'No levels'.
+
+#### Microsoft Graph API
+
+**API Permissions**: At least *Application.Read.All* (Application permission)
+
+**Endpoint**: *https://graph.microsoft.com/v1.0/servicePrincipals*
+<br><br>
+### Microsoft Entra Connect/Cloud Sync
+
+#### Description
+
+This check monitors the time since the last Entra Connect/Cloud Sync synchronisation.
+
+#### Checkmk Service Example
+
+![grafik](https://github.com/user-attachments/assets/4194feb8-abf9-434d-ba53-ea367e9f9c51)
+
+#### Checkmk Parameters
+
+1. **Time since last sync**: Specify the upper levels for the last sync time from Microsoft Entra Connect/Cloud Sync. The default values are 1 hour (WARN) and 3 hours (CRIT). To ignore the last sync time, select 'No levels'.
+
+#### Microsoft Graph API
+
+**API Permissions**: At least *Organization.Read.All* (Application permission)
+
+**Endpoint**: *https://graph.microsoft.com/v1.0/organization/{organizationId}*
+<br><br>
+### Microsoft Entra SAML Certificates
 
 #### Description
 
 This check monitors the expiration time of certificates from Entra enterprise applications with SAML SSO configured.
 
-#### Checkmk service example
+#### Checkmk Service Example
 
 ![grafik](https://github.com/user-attachments/assets/86863d2c-009b-465b-915e-3a1a25922892)
 
@@ -83,7 +105,7 @@ This check monitors the expiration time of certificates from Entra enterprise ap
 
 #### Microsoft Graph API
 
-**API permissions**: At  least *Application.Read.All* (Application permission)
+**API Permissions**: At  least *Application.Read.All* (Application permission)
 
 **Endpoint**: *https://graph.microsoft.com/beta/servicePrincipals*
 
