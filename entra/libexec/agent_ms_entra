@@ -272,7 +272,7 @@ class VpnApp(TypedDict):
 
 def get_entra_ca_vpn_cert(token: str, timeout: float, proxy: HTTPProxyConfig) -> List[VpnApp]:
     entra_ca_vpn_cert_url = (
-        "https://graph.microsoft.com/beta/servicePrincipals"
+        "https://graph.microsoft.com/v1.0/servicePrincipals"
         "?$filter=displayName eq 'VPN Server' and accountEnabled eq true"
         "&$select=appId,id,keyCredentials"
     )
