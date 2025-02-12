@@ -85,7 +85,7 @@ def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckRes
     # It will take the last sync timespan of the Entra Connect/Cloud Sync.
     yield from check_levels(
         sync_last_timespan,
-        levels_upper=params.get("sync_period"),
+        levels_upper=(params["sync_period"]),
         label="Last sync",
         render_func=lambda x: f"{render.timespan(abs(x))} ago",
     )
@@ -93,7 +93,7 @@ def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckRes
     # To display custom summary we need to yield Result.
     # The real state is calculated using the worst state of Result and check_levels.
     yield Result(
-        state=State.CRIT,
+        state=State.OK,
         summary=f"Sync time: {render.datetime(sync_last_timestamp)}",
     )
 
