@@ -19,8 +19,8 @@
 
 
 ####################################################################################################
-# Checkmk check plugin for monitoring the sync status of Entra connect/cloud sync.
-# The plugin works with data from the Microsoft Entra Special Agent (ms_entra).
+# Checkmk check plugin for monitoring the sync status of Entra Connect/Cloud Sync.
+# The plugin works with data from the Microsoft Entra special agent (ms_entra).
 
 # Example data from special agent:
 # <<<ms_entra_sync:sep(0)>>>
@@ -73,33 +73,28 @@ def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckRes
     if section.sync_enabled is not True:
         yield Result(
             state=State.UNKNOWN,
-            summary="Entra connect/cloud sync not active",
+            summary="Entra Connect/Cloud Sync not active",
         )
         return
-
-    params_levels_sync_period = params.get("sync_period")
 
     # Calculation of the timespan since the last sync.
     sync_last_timestamp = datetime.fromisoformat(section.sync_last).timestamp()
     sync_last_timespan = datetime.now().timestamp() - sync_last_timestamp
 
-    # This content will be used as the check result summary.
-    result_summary = f"Sync time: {render.datetime(int(sync_last_timestamp))}"
-
     # For state calculation, check_levels is used.
-    # It will take the last sync time of the Entra connect/cloud sync.
+    # It will take the last sync timespan of the Entra Connect/Cloud Sync.
     yield from check_levels(
         sync_last_timespan,
-        levels_upper=(params_levels_sync_period),
+        levels_upper=params.get("sync_period"),
         label="Last sync",
         render_func=lambda x: f"{render.timespan(abs(x))} ago",
     )
 
     # To display custom summary we need to yield Result.
-    # The real state is calculated by check_levels.
+    # The real state is calculated using the worst state of Result and check_levels.
     yield Result(
-        state=State.OK,
-        summary=result_summary,
+        state=State.CRIT,
+        summary=f"Sync time: {render.datetime(sync_last_timestamp)}",
     )
 
 

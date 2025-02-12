@@ -4,8 +4,8 @@ catalog: cloud/Microsoft
 license: GPLv2
 distribution: Christopher Pommer
 description:
- This check monitors the time since last Entra connect/cloud
- synchronisation.
+ This check monitors the time since last Entra Connect/Cloud
+ Sync synchronisation.
 
  The levels {OK}, {WARN} and {CRIT} depends on the
  configured check levels for the last sync time.
@@ -13,4 +13,5 @@ description:
  You have to configure the special agent {Microsoft Entra}.
 
 discovery:
- One service is created for the Entra synchronisation.
+ One service is created for the Entra Connect/Cloud Sync
+ synchronisation.

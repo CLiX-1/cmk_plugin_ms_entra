@@ -72,8 +72,8 @@ class SamlInfo:
     app_id: str
     app_name: str
     app_notes: Optional[str]
-    cert_expiration: str
-    cert_thumbprint: str
+    cert_expiration: Optional[str]
+    cert_thumbprint: Optional[str]
 
 
 Section = Mapping[str, SamlInfo]
@@ -101,20 +101,7 @@ def discover_ms_entra_saml_certs(section: Section) -> DiscoveryResult:
         yield Service(item=group)
 
 
-def check_ms_entra_saml_certs(
-    item: str, params: Mapping[str, Any], section: Section
-) -> CheckResult:
-    app = section.get(item)
-    if not app:
-        return
-
-    params_levels_cert_expiration = params.get("cert_expiration")
-
-    # Cert expiration time and timespan calculation
-    cert_expiration_timestamp = datetime.fromisoformat(app.cert_expiration).timestamp()
-    cert_expiration_timestamp_render = render.datetime(int(cert_expiration_timestamp))
-    cert_expiration_timespan = cert_expiration_timestamp - datetime.now().timestamp()
-
+def format_result_details(app: SamlInfo, cert_expiration_timestamp_render: str) -> str:
     # This content will be used to display the application details in the check result details with
     # the available SAML certificate.
     app_details_list = [
@@ -124,17 +111,43 @@ def check_ms_entra_saml_certs(
         "",
         f"Description: {app.app_notes or '(Not available)'}",
         "",
-        "Certificate",
-        f" - Thumbprint: {app.cert_thumbprint}",
+        "Certificate details",
+        f" - Thumbprint: {app.cert_thumbprint or '(Not available)'}",
         f" - Expiration time: {cert_expiration_timestamp_render}",
     ]
-    result_details = "\n".join(app_details_list)
+    return "\n".join(app_details_list)
 
-    # This content will be used as the check result summary.
-    result_summary = f"Expiration time: {cert_expiration_timestamp_render}"
+
+def check_ms_entra_saml_certs(
+    item: str, params: Mapping[str, Any], section: Section
+) -> CheckResult:
+    app = section.get(item)
+    if not app:
+        return
+
+    params_levels_cert_expiration = params.get("cert_expiration")
+
+    if app.cert_expiration:
+        # Cert expiration time and timespan calculation
+        cert_expiration_timestamp = datetime.fromisoformat(app.cert_expiration).timestamp()
+        cert_expiration_timestamp_render = render.datetime(cert_expiration_timestamp)
+        cert_expiration_timespan = cert_expiration_timestamp - datetime.now().timestamp()
+    else:
+        # In case the certificate expiration time is not available, the check will return
+        # UNKNOWN. It prevents a service crash while time cannot be calculated for an None value.
+        # The reason for this scenario could be the Microsoft Graph beta API.
+        yield Result(
+            state=State.UNKNOWN,
+            summary=(
+                "No certificate expiration time found. The value of "
+                "preferredTokenSigningKeyEndDateTime is empty."
+            ),
+            details=format_result_details(app, "(Not available)"),
+        )
+        return
 
     # For state calculation, check_levels is used.
-    # It will take the expiration time of the SAML certificate.
+    # It will take the expiration timespan of the SAML certificate.
     if cert_expiration_timespan > 0:
         yield from check_levels(
             cert_expiration_timespan,
@@ -151,11 +164,11 @@ def check_ms_entra_saml_certs(
         )
 
     # To display custom summary and details we need to yield Result.
-    # The real state is calculated by check_levels.
+    # The real state is calculated using the worst state of Result and check_levels.
     yield Result(
         state=State.OK,
-        summary=result_summary,
-        details=f"\n{result_details}",
+        summary=f"Expiration time: {cert_expiration_timestamp_render}",
+        details=f"\n{format_result_details(app, cert_expiration_timestamp_render)}",
     )
 
 

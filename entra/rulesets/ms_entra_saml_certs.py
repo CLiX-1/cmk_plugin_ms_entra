@@ -47,7 +47,7 @@ def _parameter_form_ms_entra_saml_certs() -> Dictionary:
         elements={
             "cert_expiration": DictElement(
                 parameter_form=SimpleLevels[float](
-                    title=Title("Certificate expiration"),
+                    title=Title("Certificate Expiration"),
                     help_text=Help(
                         "Specify the lower levels for the Microsoft Entra SAML app certificate "
                         "expiration time.<br>The default values are 14 days (WARN) and 5 days "

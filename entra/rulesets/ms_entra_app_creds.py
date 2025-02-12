@@ -52,7 +52,7 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
         elements={
             "cred_expiration": DictElement(
                 parameter_form=SimpleLevels[float](
-                    title=Title("Credential expiration"),
+                    title=Title("Credential Expiration"),
                     help_text=Help(
                         "Specify the lower levels for the Microsoft Entra app credential "
                         "expiration time.<br>The default values are 14 days (WARN) and 5 days "
@@ -69,7 +69,7 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
             ),
             "cred_exclude": DictElement(
                 parameter_form=List[str](
-                    title=Title("Exclude credentials"),
+                    title=Title("Exclude Credentials"),
                     help_text=Help(
                         "Specify a list of credential descriptions that you do not want to monitor."
                         '<br>For example, "CWAP_AuthSecret$" to ignore Microsoft Entra Application '
@@ -78,7 +78,7 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
                         "can change these descriptions over time.<br><br>"
                     ),
                     element_template=RegularExpression(
-                        title=Title("Credential description"),
+                        title=Title("Credential Description"),
                         predefined_help_text=MatchingScope.PREFIX,
                         custom_validate=(LengthInRange(min_value=1),),
                     ),

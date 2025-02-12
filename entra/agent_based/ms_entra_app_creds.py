@@ -226,7 +226,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
         result_summary = "All application credentials are excluded"
 
     # To display custom summary and details we need to yield Result.
-    # The real state is calculated by check_levels.
+    # The real state is calculated using the worst state of Result and check_levels.
     # Also if all credentials are excluded, we need to yield Result with state OK.
     yield Result(
         state=State.OK,

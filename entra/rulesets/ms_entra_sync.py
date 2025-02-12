@@ -20,7 +20,7 @@
 
 ####################################################################################################
 # Checkmk ruleset to set the thresholds for the last sync time from the Microsoft Entra
-# connect/cloud sync. This ruleset is part of the Microsoft Entra special agent (ms_entra).
+# Connect/Cloud Sync. This ruleset is part of the Microsoft Entra special agent (ms_entra).
 
 
 from cmk.rulesets.v1 import Help, Title
@@ -40,17 +40,17 @@ def _parameter_form_ms_entra_sync() -> Dictionary:
     return Dictionary(
         title=Title("Microsoft Entra Connect/Cloud Sync"),
         help_text=Help(
-            "Parameters for the last sync time thresholds from the Microsoft Entra connect/cloud "
-            "sync.<br>To use this service, you need to set up the <b>Microsoft Entra</b> special "
+            "Parameters for the last sync time thresholds from the Microsoft Entra Connect/Cloud "
+            "Sync.<br>To use this service, you need to set up the <b>Microsoft Entra</b> special "
             "agent."
         ),
         elements={
             "sync_period": DictElement(
                 parameter_form=SimpleLevels[float](
-                    title=Title("Time since last sync"),
+                    title=Title("Time since last Sync"),
                     help_text=Help(
                         "Specify the upper levels for the last sync time from Microsoft Entra "
-                        "connect/cloud sync.<br>The default values are 1 hour (WARN) and 3 hours "
+                        "Connect/Cloud Sync.<br>The default values are 1 hour (WARN) and 3 hours "
                         "(CRIT). To ignore the last sync time, select 'No levels'."
                     ),
                     form_spec_template=TimeSpan(
