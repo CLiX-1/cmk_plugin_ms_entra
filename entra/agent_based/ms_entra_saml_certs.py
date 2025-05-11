@@ -58,6 +58,7 @@ from cmk.agent_based.v2 import (
     CheckPlugin,
     CheckResult,
     DiscoveryResult,
+    Metric,
     render,
     Result,
     Service,
@@ -125,7 +126,7 @@ def check_ms_entra_saml_certs(
     if not app:
         return
 
-    params_levels_cert_expiration = params.get("cert_expiration")
+    params_levels_cert_expiration = params["cert_expiration"]
 
     if app.cert_expiration:
         # Cert expiration time and timespan calculation
@@ -152,6 +153,7 @@ def check_ms_entra_saml_certs(
         yield from check_levels(
             cert_expiration_timespan,
             levels_lower=(params_levels_cert_expiration),
+            metric_name="ms_entra_saml_certs_remaining_validity",
             label="Remaining",
             render_func=render.timespan,
         )
@@ -161,6 +163,13 @@ def check_ms_entra_saml_certs(
             levels_lower=(params_levels_cert_expiration),
             label="Expired",
             render_func=lambda x: "%s ago" % render.timespan(abs(x)),
+        )
+
+        # To prevent a negative value for the metric.
+        yield Metric(
+            name="ms_entra_saml_certs_remaining_validity",
+            value=0.0,
+            levels=params_levels_cert_expiration[1],
         )
 
     # To display custom summary and details we need to yield Result.

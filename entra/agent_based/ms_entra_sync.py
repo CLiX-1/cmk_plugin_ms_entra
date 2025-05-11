@@ -86,6 +86,7 @@ def check_ms_entra_sync(params: Mapping[str, Any], section: Section) -> CheckRes
     yield from check_levels(
         sync_last_timespan,
         levels_upper=(params["sync_period"]),
+        metric_name="ms_entra_sync_elapsed_time",
         label="Last sync",
         render_func=lambda x: f"{render.timespan(abs(x))} ago",
     )

@@ -79,6 +79,7 @@ from cmk.agent_based.v2 import (
     CheckPlugin,
     CheckResult,
     DiscoveryResult,
+    Metric,
     render,
     Result,
     Service,
@@ -203,7 +204,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
             else ""
         )
 
-        params_cred_expiration_levels = params.get("cred_expiration")
+        params_cred_expiration_levels = params["cred_expiration"]
 
         # For state calculation, check_levels is used.
         # It will take the expiration time of the credential with the earliest expiration time.
@@ -211,6 +212,7 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
             yield from check_levels(
                 cred_expiration_timespan,
                 levels_lower=(params_cred_expiration_levels),
+                metric_name="ms_entra_app_creds_remaining_validity",
                 label="Remaining",
                 render_func=render.timespan,
             )
@@ -220,6 +222,13 @@ def check_ms_entra_app_creds(item: str, params: Mapping[str, Any], section: Sect
                 levels_lower=(params_cred_expiration_levels),
                 label="Expired",
                 render_func=lambda x: f"{render.timespan(abs(x))} ago",
+            )
+
+            # To prevent a negative value for the metric.
+            yield Metric(
+                name="ms_entra_app_creds_remaining_validity",
+                value=0.0,
+                levels=params_cred_expiration_levels[1],
             )
 
     else:

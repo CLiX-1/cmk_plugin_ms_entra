@@ -55,6 +55,7 @@ from cmk.agent_based.v2 import (
     CheckPlugin,
     CheckResult,
     DiscoveryResult,
+    Metric,
     render,
     Result,
     Service,
@@ -164,7 +165,7 @@ def check_ms_entra_ca_vpn_cert(params: Mapping[str, Any], section: Section) -> C
     # Calculate the timespan until the earliest certificate expires or has expired.
     cert_expiration_timespan = cert_earliest_expiration_timestamp - datetime.now().timestamp()
 
-    params_cert_expiration_levels = params.get("cert_expiration")
+    params_cert_expiration_levels = params["cert_expiration"]
 
     # For state calculation, check_levels is used.
     # It will take the expiration time of the certificate with the earliest expiration time.
@@ -172,6 +173,7 @@ def check_ms_entra_ca_vpn_cert(params: Mapping[str, Any], section: Section) -> C
         yield from check_levels(
             cert_expiration_timespan,
             levels_lower=(params_cert_expiration_levels),
+            metric_name="ms_entra_ca_vpn_cert_remaining_validity",
             label="Remaining",
             render_func=render.timespan,
         )
@@ -181,6 +183,13 @@ def check_ms_entra_ca_vpn_cert(params: Mapping[str, Any], section: Section) -> C
             levels_lower=(params_cert_expiration_levels),
             label="Expired",
             render_func=lambda x: f"{render.timespan(abs(x))} ago",
+        )
+
+        # To prevent a negative value for the metric.
+        yield Metric(
+            name="ms_entra_ca_vpn_cert_remaining_validity",
+            value=0.0,
+            levels=params_cert_expiration_levels[1],
         )
 
     # To display custom summary and details we need to yield Result.
