@@ -34,6 +34,7 @@ from cmk.rulesets.v1.form_specs import (
     TimeSpan,
 )
 from cmk.rulesets.v1.rule_specs import CheckParameters, HostAndItemCondition, Topic
+from cmk.rulesets.v1.form_specs.validators import NumberInRange
 
 
 def _parameter_form_ms_entra_saml_certs() -> Dictionary:
@@ -54,6 +55,7 @@ def _parameter_form_ms_entra_saml_certs() -> Dictionary:
                         "(CRIT). To ignore the certificate expiration, select 'No levels'."
                     ),
                     form_spec_template=TimeSpan(
+                        custom_validate=(NumberInRange(min_value=0),),
                         displayed_magnitudes=[
                             TimeMagnitude.DAY,
                         ],

@@ -38,7 +38,7 @@ from cmk.rulesets.v1.form_specs import (
     TimeSpan,
 )
 from cmk.rulesets.v1.rule_specs import CheckParameters, HostAndItemCondition, Topic
-from cmk.rulesets.v1.form_specs.validators import LengthInRange
+from cmk.rulesets.v1.form_specs.validators import LengthInRange, NumberInRange
 
 
 def _parameter_form_ms_entra_app_creds() -> Dictionary:
@@ -59,6 +59,7 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
                         "(CRIT).<br>To ignore the credential expiration, select 'No levels'."
                     ),
                     form_spec_template=TimeSpan(
+                        custom_validate=(NumberInRange(min_value=0),),
                         displayed_magnitudes=[
                             TimeMagnitude.DAY,
                         ],
