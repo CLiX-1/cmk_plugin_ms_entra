@@ -17,12 +17,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 ####################################################################################################
-# Checkmk check plugin for monitoring the expiration of the Conditional Access VPN cerificate.
-# The plugin works with data from the Microsoft Entra special agent (ms_entra).
+# CHECKMK CHECK PLUG-IN: Microsoft Entra CA VPN Certificate
+#
+# This plug-in generates the Checkmk services and determines their status.
+# This file is part of the Microsoft Entra special agent (ms_entra).
+####################################################################################################
 
-# Example data from special agent:
+# Example data from special agent (formatted):
 # <<<ms_entra_ca_vpn_cert:sep(0)>>>
 # [
 #     {
@@ -47,7 +49,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, List, Dict
+from typing import Any
 
 from cmk.agent_based.v2 import (
     AgentSection,
@@ -77,10 +79,10 @@ class VpnApp:
     app_name: str
     app_appid: str
     app_id: str
-    app_certs: List[VpnAppCert]
+    app_certs: list[VpnAppCert]
 
 
-Section = List[VpnApp]
+Section = list[VpnApp]
 
 
 def parse_ms_entra_ca_vpn_cert(string_table: StringTable) -> Section:
@@ -121,7 +123,7 @@ def check_ms_entra_ca_vpn_cert(params: Mapping[str, Any], section: Section) -> C
 
     app = section[0]
 
-    cert_earliest_expiration: Dict[str, Any] = {}
+    cert_earliest_expiration: dict[str, Any] = {}
     result_details_cert_list = []
 
     for cert in app.app_certs:

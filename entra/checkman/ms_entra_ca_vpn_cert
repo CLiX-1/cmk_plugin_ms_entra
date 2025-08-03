@@ -1,17 +1,48 @@
-title: Microsoft Entra: Conditional Access VPN Certificate
-agents: entra
-catalog: cloud/Microsoft
+title: Microsoft Entra: CA VPN Certificate
+agents: special
+catalog: cloud/microsoft
 license: GPLv2
 distribution: Christopher Pommer
 description:
- This check monitors the expiration time of certificates
- from the Entra Conditional Access VPN enterprise application
- (service principal) with the name "VPN Server".
+ This check monitors the expiration status of certificates associated with
+ the Microsoft Entra Conditional Access VPN enterprise application. Conditional
+ Access VPN allows organizations to enforce access policies before granting
+ VPN connectivity to users and devices.
 
- The levels {OK}, {WARN} and {CRIT} depends on the
- configured check levels for the certificate expiration time.
+ The check processes data collected by the {Microsoft Entra} special agent,
+ which queries the Microsoft Graph API to retrieve certificate information
+ from the enterprise application (service principal) named "VPN Server".
 
- You have to configure the special agent {Microsoft Entra}.
+ The service monitors certificates associated with the VPN Server application
+ and tracks the certificate with the earliest expiration time. Multiple
+ certificates may be present, but only the one expiring soonest determines
+ the service state.
+
+ Special handling for duplicate applications:
+
+ {UNKNOWN}: Multiple enterprise applications named "VPN Server" found - the
+ service cannot determine which one is used for Conditional Access VPN and
+ displays a warning message requesting unique naming.
+
+ Default mapping:
+
+ {OK}: Certificate expires in more than 14 days
+
+ {WARN}: Certificate expires within 14 days
+
+ {CRIT}: Certificate expires within 5 days
+
+ For expired certificates, the service continues to report critical state and
+ displays the expiration timespan as "X ago" format.
+
+ The service details include the VPN Server application information (name, app ID,
+ object ID) and detailed information for all associated certificates including
+ IDs, descriptions, and expiration times.
+
+ You must configure the {Microsoft Entra} special agent to collect Conditional
+ Access VPN certificate data from your Entra tenant.
 
 discovery:
- One service is created for the VPN Server enterprise application.
+ One service named "Entra CA VPN certificate" is created automatically if
+ one or more enterprise applications named "VPN Server" are found in the Entra
+ tenant.

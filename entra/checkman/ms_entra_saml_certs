@@ -1,20 +1,53 @@
 title: Microsoft Entra: SAML Certificates
-agents: entra
-catalog: cloud/Microsoft
+agents: special
+catalog: cloud/microsoft
 license: GPLv2
 distribution: Christopher Pommer
 description:
- This check monitors the expiration time of certificates
- from Entra enterprise applications with SAML SSO configured.
+ This check monitors the expiration status of SAML certificates associated
+ with Microsoft Entra enterprise applications configured for SAML Single
+ Sign-On (SSO). SAML certificates are used to sign and validate SAML tokens
+ during authentication flows.
 
- The levels {OK}, {WARN} and {CRIT} depends on the
- configured check levels for the certificate expiration time.
+ The check processes data collected by the {Microsoft Entra} special agent,
+ which queries the Microsoft Graph API to retrieve SAML certificate information
+ for all enterprise applications with SAML SSO configuration in the Entra tenant.
 
- You have to configure the special agent {Microsoft Entra}.
+ Each SAML-enabled enterprise application has a signing certificate that must
+ be monitored for expiration to prevent authentication failures. The service
+ tracks the certificate expiration time and uses configurable thresholds to
+ alert before expiration.
+
+ Special handling for missing certificate data:
+
+ {UNKNOWN}: Certificate expiration time is not available (empty
+ preferredTokenSigningKeyEndDateTime value)
+
+ Default mapping:
+
+ {OK}: Certificate expires in more than 14 days
+
+ {WARN}: Certificate expires within 14 days
+
+ {CRIT}: Certificate expires within 5 days
+
+ For expired certificates, the service continues to report critical state and
+ displays the expiration timespan as "X ago" format.
+
+ The service details include complete application information such as app name,
+ app ID, object ID, description, and certificate details including thumbprint
+ and expiration time.
+
+ You must configure the {Microsoft Entra} special agent to collect SAML
+ certificate data from your Entra tenant.
 
 item:
- The name of the entra enterprise application.
+ The name of the enterprise application as configured in Entra. If multiple
+ applications share the same name, the last 4 characters of the object ID
+ are appended for unique identification (e.g., "SAML App 1 a1b2").
 
 discovery:
- One service is created for each entra enterprise application
- with SAML SSO configured.
+ One service is created automatically for each enterprise application with
+ SAML SSO configuration found in the Entra tenant. Services are named
+ "Entra SAML certificate {app_name}" where {app_name} is the configured
+ application name, potentially with ID suffix for uniqueness.

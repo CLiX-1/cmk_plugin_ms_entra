@@ -1,21 +1,52 @@
 title: Microsoft Entra: App Credentials
-agents: entra
-catalog: cloud/Microsoft
+agents: special
+catalog: cloud/microsoft
 license: GPLv2
 distribution: Christopher Pommer
 description:
- This check monitors the expiration time of secrets and
- certificates from Entra app registrations.
+ This check monitors the expiration status of secrets and certificates
+ associated with Microsoft Entra app registrations. App registrations allow
+ applications to authenticate with Microsoft Entra ID using client secrets
+ or certificates as credentials.
 
- The levels {OK}, {WARN} and {CRIT} depends on the
- configured check levels for the certificate expiration time.
+ The check processes data collected by the {Microsoft Entra} special agent,
+ which queries the Microsoft Graph API to retrieve credential information
+ for all app registrations in the Entra tenant.
 
- You have to configure the special agent {Microsoft Entra}.
+ Each app registration can have multiple credentials of the same type (secrets
+ or certificates). The service monitors the credential with the earliest
+ expiration time for each credential type and uses configurable thresholds
+ to alert before expiration.
+
+ Credential exclusion functionality allows administrators to ignore specific
+ credentials based on regular expression patterns matching credential descriptions.
+ This is useful for excluding system-managed credentials like Microsoft Entra
+ Application Proxy secrets.
+
+ Default mapping:
+
+ {OK}: Credential expires in more than 14 days
+
+ {WARN}: Credential expires within 14 days
+
+ {CRIT}: Credential expires within 5 days
+
+ For expired credentials, the service continues to report critical state and
+ displays the expiration timespan as "X ago" format.
+
+ The service details include complete app registration information such as
+ app name, app ID, object ID, description, and detailed information for all
+ associated credentials including IDs, descriptions, and expiration times.
+
+ You must configure the {Microsoft Entra} special agent to collect app
+ registration credential data from your Entra tenant.
 
 item:
- The name of the entra app registration and the credential type.
+ The app registration name combined with the credential type, formatted as
+ "{app_name} - {credential_type}". Credential types are "Secret" for client
+ secrets and "Certificate" for certificates.
 
 discovery:
- One service is created for each credential type per entra app
- registration. For each credential type the credential
- with the earliest expiration time is selected.
+ One service is created automatically for each credential type found per
+ app registration. Services are named "Entra app creds {app_name} - {credential_type}"
+ where separate services monitor secrets and certificates independently.

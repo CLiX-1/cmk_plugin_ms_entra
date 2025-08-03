@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 ####################################################################################################
-# Checkmk ruleset to set the expiration time thresholds for Microsoft Entra app registration
-# credentials or/and exclude specific credentials. This ruleset is part of the Microsoft Entra
-# special agent (ms_entra).
-
+# CHECKMK RULESET: Microsoft Entra App Credentials (check plug-in)
+#
+# This file defines the check plug-in parameters for the "Microsoft Entra App Credentials" check.
+# The check is part of the Microsoft Entra special agent (ms_entra).
+####################################################################################################
 
 from cmk.rulesets.v1 import Help, Title
 from cmk.rulesets.v1.form_specs import (
@@ -43,7 +43,7 @@ from cmk.rulesets.v1.form_specs.validators import LengthInRange, NumberInRange
 
 def _parameter_form_ms_entra_app_creds() -> Dictionary:
     return Dictionary(
-        title=Title("Microsoft Entra App Credentials"),
+        title=Title("Check parameters"),
         help_text=Help(
             "Parameters for Microsoft Entra app registration credentials like secrets and "
             "certificates.<br>To use this service, you need to set up the <b>Microsoft Entra</b> "
@@ -52,7 +52,7 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
         elements={
             "cred_expiration": DictElement(
                 parameter_form=SimpleLevels[float](
-                    title=Title("Credential Expiration"),
+                    title=Title("Credential expiration"),
                     help_text=Help(
                         "Specify the lower levels for the Microsoft Entra app credential "
                         "expiration time.<br>The default values are 14 days (WARN) and 5 days "
@@ -70,7 +70,7 @@ def _parameter_form_ms_entra_app_creds() -> Dictionary:
             ),
             "cred_exclude": DictElement(
                 parameter_form=List[str](
-                    title=Title("Exclude Credentials"),
+                    title=Title("Exclude credentials"),
                     help_text=Help(
                         "Specify a list of credential descriptions that you do not want to monitor."
                         '<br>For example, "CWAP_AuthSecret$" to ignore Microsoft Entra Application '

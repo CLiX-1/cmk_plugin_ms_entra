@@ -17,13 +17,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 ####################################################################################################
-# Checkmk check plugin for monitoring the expiration of secrets and certificates from
-# Microsoft Entra App Registrations.
-# The plugin works with data from the Microsoft Entra Special Agent (ms_entra).
+# CHECKMK CHECK PLUG-IN: Microsoft Entra App Credentials
+#
+# This plug-in generates the Checkmk services and determines their status.
+# This file is part of the Microsoft Entra special agent (ms_entra).
+####################################################################################################
 
-# Example data from special agent:
+# Example data from special agent (formatted):
 # <<<ms_entra_app_creds:sep(0)>>>
 # [
 #   {
@@ -71,7 +72,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, List, Optional, TypedDict
+from typing import Any, TypedDict
 
 from cmk.agent_based.v2 import (
     AgentSection,
@@ -90,8 +91,8 @@ from cmk.agent_based.v2 import (
 
 class AppCred(TypedDict):
     cred_id: str
-    cred_name: Optional[str]
-    cred_identifier: Optional[str]
+    cred_name: str | None
+    cred_identifier: str | None
     cred_expiration: str
 
 
@@ -100,9 +101,9 @@ class AppRegistration:
     app_name: str
     app_appid: str
     app_id: str
-    app_notes: Optional[str]
+    app_notes: str | None
     cred_type: str
-    app_creds: List[AppCred]
+    app_creds: list[AppCred]
 
 
 Section = Mapping[str, AppRegistration]

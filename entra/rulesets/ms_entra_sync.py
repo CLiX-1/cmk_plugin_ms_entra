@@ -17,11 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 ####################################################################################################
-# Checkmk ruleset to set the thresholds for the last sync time from the Microsoft Entra
-# Connect/Cloud Sync. This ruleset is part of the Microsoft Entra special agent (ms_entra).
-
+# CHECKMK RULESET: Microsoft Entra Connect/Cloud Sync (check plug-in)
+#
+# This file defines the check plug-in parameters for the "Microsoft Entra Connect/Cloud Sync" check.
+# The check is part of the Microsoft Entra special agent (ms_entra).
+####################################################################################################
 
 from cmk.rulesets.v1 import Help, Title
 from cmk.rulesets.v1.form_specs import (
@@ -39,7 +40,7 @@ from cmk.rulesets.v1.form_specs.validators import NumberInRange
 
 def _parameter_form_ms_entra_sync() -> Dictionary:
     return Dictionary(
-        title=Title("Microsoft Entra Connect/Cloud Sync"),
+        title=Title("Check parameters"),
         help_text=Help(
             "Parameters for the last sync time thresholds from the Microsoft Entra Connect/Cloud "
             "Sync.<br>To use this service, you need to set up the <b>Microsoft Entra</b> special "
@@ -48,7 +49,7 @@ def _parameter_form_ms_entra_sync() -> Dictionary:
         elements={
             "sync_period": DictElement(
                 parameter_form=SimpleLevels[float](
-                    title=Title("Time since last Sync"),
+                    title=Title("Time since last sync"),
                     help_text=Help(
                         "Specify the upper levels for the last sync time from Microsoft Entra "
                         "Connect/Cloud Sync.<br>The default values are 1 hour (WARN) and 3 hours "

@@ -17,12 +17,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 ####################################################################################################
-# Checkmk check plugin for monitoring the sync status of Entra Connect/Cloud Sync.
-# The plugin works with data from the Microsoft Entra special agent (ms_entra).
+# CHECKMK CHECK PLUG-IN: Microsoft Entra Connect/Cloud Sync
+#
+# This plug-in generates the Checkmk services and determines their status.
+# This file is part of the Microsoft Entra special agent (ms_entra).
+####################################################################################################
 
-# Example data from special agent:
+# Example data from special agent (formatted):
 # <<<ms_entra_sync:sep(0)>>>
 # {
 #     "sync_enabled": true,
@@ -34,7 +36,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from cmk.agent_based.v2 import (
     AgentSection,
@@ -52,8 +54,8 @@ from cmk.agent_based.v2 import (
 
 @dataclass(frozen=True)
 class EntraSyncStatus:
-    sync_enabled: Optional[bool]
-    sync_last: Optional[str]
+    sync_enabled: bool | None
+    sync_last: str | None
 
 
 Section = EntraSyncStatus

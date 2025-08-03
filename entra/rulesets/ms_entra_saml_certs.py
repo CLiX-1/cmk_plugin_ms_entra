@@ -17,11 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 ####################################################################################################
-# Checkmk ruleset to set the expiration time thresholds for Microsoft Entra SAML app certificates.
-# This ruleset is part of the Microsoft Entra special agent (ms_entra).
-
+# CHECKMK RULESET: Microsoft Entra SAML App Certificates (check plug-in)
+#
+# This file defines the check plug-in parameters for the "Microsoft Entra SAML App Certificates"
+# check. The check is part of the Microsoft Entra special agent (ms_entra).
+####################################################################################################
 
 from cmk.rulesets.v1 import Help, Title
 from cmk.rulesets.v1.form_specs import (
@@ -39,7 +40,7 @@ from cmk.rulesets.v1.form_specs.validators import NumberInRange
 
 def _parameter_form_ms_entra_saml_certs() -> Dictionary:
     return Dictionary(
-        title=Title("Microsoft Entra SAML App Certificates"),
+        title=Title("Check parameters"),
         help_text=Help(
             "Parameters for the expiration time thresholds from Microsoft Entra SAML app "
             "certificates.<br>To use this service, you need to set up the <b>Microsoft Entra</b> "
@@ -48,7 +49,7 @@ def _parameter_form_ms_entra_saml_certs() -> Dictionary:
         elements={
             "cert_expiration": DictElement(
                 parameter_form=SimpleLevels[float](
-                    title=Title("Certificate Expiration"),
+                    title=Title("Certificate expiration"),
                     help_text=Help(
                         "Specify the lower levels for the Microsoft Entra SAML app certificate "
                         "expiration time.<br>The default values are 14 days (WARN) and 5 days "
