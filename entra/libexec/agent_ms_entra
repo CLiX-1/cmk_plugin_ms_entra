@@ -266,11 +266,11 @@ def get_appid_via_batch(
         apps_batch_dict = apps_batch_response.json()
         apps_batch = apps_batch_dict.get("responses", [])
 
-        for batch_response in apps_batch:
-            status = batch_response["status"]
+        for batch_app in apps_batch:
+            status = batch_app["status"]
 
             if status == 200:
-                all_object_ids.append(batch_response["body"].get("id"))
+                all_object_ids.append(batch_app["body"].get("id"))
             elif status == 429:
                 error = Exception(f"Error {status}: Throttling error.")
                 handle_error(
@@ -279,7 +279,7 @@ def get_appid_via_batch(
                     24,
                 )
             else:
-                error_body = batch_response.get("body", {}).get("error", {}).get("message", "")
+                error_body = batch_app.get("body", {}).get("error", {}).get("message", "")
                 error = Exception(f"Error {status}: {error_body}")
                 handle_error(error, "Failed to get Entra app proxy object IDs.", 25)
 
@@ -299,6 +299,80 @@ def get_entra_app_proxy_object_ids(
         return get_appid_via_filter(app_ids, headers, timeout, proxy)
     else:
         return get_appid_via_batch(app_ids, headers, timeout, proxy)
+
+
+def get_app_proxy_certs_via_batch(
+    app_object_ids: list[str], headers: dict, timeout: float, proxy: HTTPProxyConfig
+) -> list[dict]:
+    app_proxies = []
+
+    for i in range(0, len(app_object_ids), GRAPH_API_BATCH_SIZE):
+        batch_app_ids = app_object_ids[i : i + GRAPH_API_BATCH_SIZE]
+
+        apps_batch_requests = {
+            "requests": [
+                {
+                    "id": str(idx),
+                    "method": "GET",
+                    "url": (
+                        f"/applications/{app_id}?$select=appId,id,displayName,notes,"
+                        "onPremisesPublishing"
+                    ),
+                }
+                for idx, app_id in enumerate(batch_app_ids)
+            ]
+        }
+        try:
+            # onPremisesPublishing is not available in v1.0 (2025-02-09)
+            apps_batch_response = requests.post(
+                f"{GRAPH_API_BETA}/$batch",
+                headers={**headers, "Content-Type": "application/json"},
+                json=apps_batch_requests,
+                timeout=timeout,
+                proxies=proxy.to_requests_proxies(),
+            )
+            apps_batch_response.raise_for_status()
+        except requests.exceptions.Timeout as err:
+            handle_error(err, "Timeout while getting Entra app proxy apps.", 14)
+        except requests.exceptions.RequestException as err:
+            error_message = "Failed to get Entra app proxy apps."
+            error_message_details = {
+                429: f"{error_message} Request has been throttled.",
+            }
+            status_code = getattr(err.response, "status_code", 0)
+            handle_error(err, error_message_details.get(status_code, error_message), 26)
+
+        apps_batch_dict = apps_batch_response.json()
+        apps_batch = apps_batch_dict.get("responses", [])
+
+        for batch_app in apps_batch:
+            status = batch_app["status"]
+
+            if status == 200:
+                app_body = batch_app["body"]
+                app_on_prem = app_body.get("onPremisesPublishing", {})
+
+                if not app_on_prem.get("isOnPremPublishingEnabled"):
+                    continue
+
+                cert_metadata = app_on_prem.get("verifiedCustomDomainCertificatesMetadata", {})
+                if not cert_metadata:
+                    continue
+
+                app_proxies.append(app_body)
+            elif status == 429:
+                error = Exception(f"Error {status}: Throttling error.")
+                handle_error(
+                    error,
+                    "Failed to get Entra app proxies. Request has been throttled.",
+                    27,
+                )
+            else:
+                error_body = batch_app.get("body", {}).get("error", {}).get("message", "")
+                error = Exception(f"Error {status}: {error_body}")
+                handle_error(error, "Failed to get Entra app proxies.", 28)
+
+    return app_proxies
 
 
 class AppProxyInfo(TypedDict):
@@ -323,50 +397,9 @@ def get_entra_app_proxy_certs(
 
     app_object_ids = get_entra_app_proxy_object_ids(token, timeout, proxy, app_app_ids)
 
-    # onPremisesPublishing is not available in v1.0 (2025-02-09)
-    base_url = f"{GRAPH_API_BETA}/applications"
-    attributes = "appId,id,displayName,notes,onPremisesPublishing"
-
     headers = {"Authorization": f"Bearer {token}"}
 
-    entra_app_proxy_apps = []
-
-    for app_id in app_object_ids:
-        entra_app_proxy_url = f"{base_url}/{app_id}?$select={attributes}"
-
-        try:
-            entra_app_proxy_app_response = requests.get(
-                entra_app_proxy_url,
-                headers=headers,
-                timeout=timeout,
-                proxies=proxy.to_requests_proxies(),
-            )
-            entra_app_proxy_app_response.raise_for_status()
-        except requests.exceptions.Timeout as err:
-            handle_error(err, "Timeout while getting Entra app proxy certificate.", 14)
-        except requests.exceptions.RequestException as err:
-            error_message = "Failed to get Entra app proxy certificate."
-            error_message_details = {
-                403: (
-                    f"{error_message} Please check application API permissions. At least "
-                    "Directory.Read.All is required."
-                ),
-                429: f"{error_message} Request has been throttled.",
-            }
-            status_code = getattr(err.response, "status_code", 0)
-            handle_error(err, error_message_details.get(status_code, error_message), 26)
-
-        entra_app_proxy_app_dict = entra_app_proxy_app_response.json()
-
-        app_on_prem = entra_app_proxy_app_dict.get("onPremisesPublishing", {})
-        if not app_on_prem.get("isOnPremPublishingEnabled"):
-            continue
-
-        cert_metadata = app_on_prem.get("verifiedCustomDomainCertificatesMetadata", {})
-        if not cert_metadata:
-            continue
-
-        entra_app_proxy_apps.append(entra_app_proxy_app_dict)
+    entra_app_proxy_apps = get_app_proxy_certs_via_batch(app_object_ids, headers, timeout, proxy)
 
     app_info_list: list[AppProxyInfo] = [
         AppProxyInfo(
@@ -426,7 +459,7 @@ def get_entra_app_registration_creds(
             )
             entra_app_registration_response.raise_for_status()
         except requests.exceptions.Timeout as err:
-            handle_error(err, "Timeout while getting Entra app registrations.", 15)
+            handle_error(err, "Timeout while getting Entra app registrations.", 16)
         except requests.exceptions.RequestException as err:
             error_message = "Failed to get Entra app registrations."
             error_message_details = {
@@ -524,7 +557,7 @@ def get_entra_ca_vpn_certs(token: str, timeout: float, proxy: HTTPProxyConfig) -
         )
         entra_ca_vpn_certs_response.raise_for_status()
     except requests.exceptions.Timeout as err:
-        handle_error(err, "Timeout while getting Entra Conditional Access VPN certificate.", 16)
+        handle_error(err, "Timeout while getting Entra Conditional Access VPN certificate.", 17)
     except requests.exceptions.RequestException as err:
         error_message = "Failed to get Entra Conditional Access VPN certificate."
         error_message_details = {
@@ -595,7 +628,7 @@ def get_entra_sync(
         )
         entra_sync_response.raise_for_status()
     except requests.exceptions.Timeout as err:
-        handle_error(err, "Timeout while getting Entra Connect/Cloud Sync.", 17)
+        handle_error(err, "Timeout while getting Entra Connect/Cloud Sync.", 18)
     except requests.exceptions.RequestException as err:
         error_message = "Failed to get Entra Connect/Cloud Sync."
         error_message_details = {
@@ -651,7 +684,7 @@ def get_entra_saml_certs(token: str, timeout: float, proxy: HTTPProxyConfig) -> 
             entra_saml_certs_response.raise_for_status()
         except requests.exceptions.Timeout as err:
             handle_error(
-                err, "Timeout while getting Entra service principals with SAML configured.", 18
+                err, "Timeout while getting Entra service principals with SAML configured.", 19
             )
         except requests.exceptions.RequestException as err:
             error_message = "Failed to get Entra service principals with SAML configured."
