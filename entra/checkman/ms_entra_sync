@@ -1,17 +1,40 @@
 title: Microsoft Entra: Connect/Cloud Sync
-agents: entra
-catalog: cloud/Microsoft
+agents: special
+catalog: cloud/misc
 license: GPLv2
 distribution: Christopher Pommer
 description:
- This check monitors the time since last Entra Connect/Cloud
- Sync synchronisation.
+ This check monitors the synchronization status of Microsoft Entra Connect
+ or Microsoft Entra Cloud Sync. These services synchronize on-premises
+ Active Directory objects with Microsoft Entra ID (Azure AD) to enable
+ hybrid identity scenarios.
 
- The levels {OK}, {WARN} and {CRIT} depends on the
- configured check levels for the last sync time.
+ The check processes data collected by the {Microsoft Entra} special agent,
+ which queries the Microsoft Graph API to retrieve synchronization status
+ information from the Entra tenant.
 
- You have to configure the special agent {Microsoft Entra}.
+ The service monitors both sync enablement status and the time elapsed since
+ the last successful synchronization:
+
+ Sync enablement status:
+
+ {UNKNOWN}: Entra Connect/Cloud Sync is not active or enabled
+
+ Default mapping:
+
+ {OK}: Last sync occurred within 1 hour
+
+ {WARN}: Last sync occurred more than 1 hour ago
+
+ {CRIT}: Last sync occurred more than 3 hours ago
+
+ The service displays the timestamp of the last synchronization and tracks
+ the elapsed time since then. Regular synchronization is critical for
+ maintaining consistency between on-premises and cloud identities.
+
+ You must configure the {Microsoft Entra} special agent to collect
+ synchronization status data from your Entra tenant.
 
 discovery:
- One service is created for the Entra Connect/Cloud Sync
- synchronisation.
+ One service named "Entra connect sync" is created automatically if
+ synchronization information is available in the Entra tenant.
