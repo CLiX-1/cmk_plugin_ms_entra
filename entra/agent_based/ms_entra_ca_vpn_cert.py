@@ -108,15 +108,15 @@ def check_ms_entra_ca_vpn_cert(params: Mapping[str, Any], section: Section) -> C
     if not section:
         return
 
-    # If there is more than one service principal with the name "VPN Server," the check will return
+    # If there is more than one service principal with the name "VPN Server", the check will return
     # UNKNOWN because it is not clear which one is used for the Entra Conditional Access VPN.
     if len(section) > 1:
         yield Result(
             state=State.UNKNOWN,
             summary=(
-                "Multiple Entra service principals with the same name found (VPN Server). "
-                "Cannot decide which one is for the Conditional Access VPN. Please keep the name "
-                "of the service principal unique."
+                'Multiple Entra service principals with the name "VPN Server" found. '
+                "Cannot decide which one is for the Conditional Access VPN. Please keep the names "
+                "of the service principals unique."
             ),
         )
         return
