@@ -1,0 +1,42 @@
+title: Microsoft Entra: App Proxy Certificates
+agents: special
+catalog: cloud/misc
+license: GPLv2
+distribution: Christopher Pommer
+description:
+ This check monitors the expiration status of custom certificates uploaded
+ to Microsoft Entra application proxy service principals. These certificates are used
+ for TLS connections to the externally published site.
+
+ The check processes data collected by the {Microsoft Entra} special agent,
+ which queries the Microsoft Graph API to retrieve all app proxy service principals
+ in the Entra tenant and the associated app registration certificate information.
+
+ Default mapping:
+
+ {OK}: Certificate expires in more than 14 days
+
+ {WARN}: Certificate expires within 14 days
+
+ {CRIT}: Certificate expires within 5 days
+
+ For expired certificates, the service continues to report critical state and
+ displays the expiration timespan as "X ago" format.
+
+ The service details include complete application information such as app name,
+ app ID, object ID, description, external URL, internal URL and certificate
+ details including thumbprint and expiration time.
+
+ You must configure the {Microsoft Entra} special agent to collect SAML
+ certificate data from your Entra tenant.
+
+item:
+ The name of the app registration as configured in Entra. If multiple
+ applications share the same name, the last 4 characters of the object ID
+ are appended for unique identification (e.g., "SAML App 1 a1b2").
+
+discovery:
+ One service is created automatically for each app registration configured as
+ app proxy with custom certificate. Services are named
+ "Entra app proxy certificate {app_name}" where {app_name} is the configured
+ application name, potentially with ID suffix for uniqueness.

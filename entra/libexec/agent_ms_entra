@@ -35,6 +35,14 @@ import requests
 import cmk.utils.password_store
 from cmk.utils.http_proxy_config import deserialize_http_proxy_config, HTTPProxyConfig
 
+# Microsoft Graph API base URLs
+GRAPH_API_BASE = "https://graph.microsoft.com"
+GRAPH_API_V1 = f"{GRAPH_API_BASE}/v1.0"
+GRAPH_API_BETA = f"{GRAPH_API_BASE}/beta"
+
+# Microsoft Graph API batch request limit
+GRAPH_API_BATCH_SIZE = 20
+
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -62,8 +70,8 @@ def parse_arguments() -> argparse.Namespace:
         "--services-to-monitor",
         required=False,
         help=(
-            "Comma-separated services to monitor (entra_app_registration_creds, entra_ca_vpn_cert, "
-            "entra_sync, entra_saml_certs)"
+            "Comma-separated services to monitor (ms_entra_app_proxy_certs, "
+            "entra_app_registration_creds, entra_ca_vpn_cert, entra_sync, entra_saml_certs)"
         ),
     )
     parser.add_argument(
@@ -121,11 +129,7 @@ def get_access_token(
         )
         token_response.raise_for_status()
     except requests.exceptions.Timeout as err:
-        handle_error(
-            err,
-            "Timeout while getting access token.",
-            11,
-        )
+        handle_error(err, "Timeout while getting access token.", 10)
     except requests.exceptions.RequestException as err:
         error_message = "Failed to get access token."
         error_message_details = {
@@ -134,11 +138,7 @@ def get_access_token(
             429: f"{error_message} Request has been throttled.",
         }
         status_code = getattr(err.response, "status_code", 0)
-        handle_error(
-            err,
-            error_message_details.get(status_code, error_message),
-            1,
-        )
+        handle_error(err, error_message_details.get(status_code, error_message), 20)
 
     token_response_dict = token_response.json()
     access_token = token_response_dict["access_token"]
@@ -146,27 +146,269 @@ def get_access_token(
     return access_token
 
 
+def get_entra_app_proxy_app_ids(token: str, timeout: float, proxy: HTTPProxyConfig) -> list[str]:
+    entra_app_proxy_apps_url = (
+        f"{GRAPH_API_V1}/servicePrincipals"
+        "?$filter=tags/any(t:t eq 'WindowsAzureActiveDirectoryOnPremApp')&$select=appId"
+    )
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    entra_app_proxy_apps = []
+
+    while entra_app_proxy_apps_url:
+        try:
+            entra_app_proxy_apps_response = requests.get(
+                entra_app_proxy_apps_url,
+                headers=headers,
+                timeout=timeout,
+                proxies=proxy.to_requests_proxies(),
+            )
+            entra_app_proxy_apps_response.raise_for_status()
+        except requests.exceptions.Timeout as err:
+            handle_error(
+                err, "Timeout while getting Entra app proxy service principal app IDs.", 11
+            )
+        except requests.exceptions.RequestException as err:
+            error_message = "Failed to get Entra app proxy service principal app IDs."
+            error_message_details = {
+                403: (
+                    # Application.Read.All is required for this request, but Directory.Read.All
+                    # is required for the dependent get_entra_app_proxy_certs function.
+                    f"{error_message} Please check application API permissions. At least "
+                    "Directory.Read.All is required."
+                ),
+                429: f"{error_message} Request has been throttled.",
+            }
+            status_code = getattr(err.response, "status_code", 0)
+            handle_error(err, error_message_details.get(status_code, error_message), 21)
+
+        entra_app_proxy_apps_dict = entra_app_proxy_apps_response.json()
+        entra_app_proxy_apps.extend(entra_app_proxy_apps_dict.get("value", []))
+
+        # Get next page if available (pagination)
+        entra_app_proxy_apps_url = entra_app_proxy_apps_dict.get("@odata.nextLink")
+
+    entra_app_proxy_app_ids = [app.get("appId") for app in entra_app_proxy_apps if app.get("appId")]
+
+    return entra_app_proxy_app_ids
+
+
+def get_appid_via_filter(
+    app_ids: list[str], headers: dict, timeout: float, proxy: HTTPProxyConfig
+) -> list[str]:
+    filter_query = " or ".join([f"appId eq '{app_id}'" for app_id in app_ids])
+
+    apps_url = f"{GRAPH_API_V1}/applications?$filter={filter_query}&$select=id"
+
+    try:
+        apps_response = requests.get(
+            apps_url,
+            headers=headers,
+            timeout=timeout,
+            proxies=proxy.to_requests_proxies(),
+        )
+        apps_response.raise_for_status()
+    except requests.exceptions.Timeout as err:
+        handle_error(err, "Timeout while getting Entra app proxy object IDs.", 12)
+    except requests.exceptions.RequestException as err:
+        error_message = "Failed to get Entra app proxy object IDs."
+        error_message_details = {
+            429: f"{error_message} Request has been throttled.",
+        }
+        status_code = getattr(err.response, "status_code", 0)
+        handle_error(err, error_message_details.get(status_code, error_message), 22)
+
+    apps_dict = apps_response.json()
+    apps = apps_dict.get("value", [])
+
+    return [app["id"] for app in apps]
+
+
+def get_appid_via_batch(
+    app_ids: list[str], headers: dict, timeout: float, proxy: HTTPProxyConfig
+) -> list[str]:
+    all_object_ids = []
+
+    for i in range(0, len(app_ids), GRAPH_API_BATCH_SIZE):
+        batch_app_ids = app_ids[i : i + GRAPH_API_BATCH_SIZE]
+
+        apps_batch_requests = {
+            "requests": [
+                {
+                    "id": str(idx),
+                    "method": "GET",
+                    "url": f"/applications(appId='{app_id}')?$select=id",
+                }
+                for idx, app_id in enumerate(batch_app_ids)
+            ]
+        }
+
+        try:
+            apps_batch_response = requests.post(
+                f"{GRAPH_API_V1}/$batch",
+                headers={**headers, "Content-Type": "application/json"},
+                json=apps_batch_requests,
+                timeout=timeout,
+                proxies=proxy.to_requests_proxies(),
+            )
+            apps_batch_response.raise_for_status()
+        except requests.exceptions.Timeout as err:
+            handle_error(err, "Timeout while getting Entra app proxy object IDs.", 13)
+        except requests.exceptions.RequestException as err:
+            error_message = "Failed to get Entra app proxy object IDs."
+            error_message_details = {
+                429: f"{error_message} Request has been throttled.",
+            }
+            status_code = getattr(err.response, "status_code", 0)
+            handle_error(err, error_message_details.get(status_code, error_message), 23)
+
+        apps_batch_dict = apps_batch_response.json()
+        apps_batch = apps_batch_dict.get("responses", [])
+
+        for batch_response in apps_batch:
+            status = batch_response["status"]
+
+            if status == 200:
+                all_object_ids.append(batch_response["body"].get("id"))
+            elif status == 429:
+                error = Exception(f"Error {status}: Throttling error.")
+                handle_error(
+                    error,
+                    "Failed to get Entra app proxy object IDs. Request has been throttled.",
+                    24,
+                )
+            else:
+                error_body = batch_response.get("body", {}).get("error", {}).get("message", "")
+                error = Exception(f"Error {status}: {error_body}")
+                handle_error(error, "Failed to get Entra app proxy object IDs.", 25)
+
+    return all_object_ids
+
+
+def get_entra_app_proxy_object_ids(
+    token: str,
+    timeout: float,
+    proxy: HTTPProxyConfig,
+    app_ids: list[str],
+    batch_threshold: int = 20,  # Threshold to decide between batch vs. filter (URL length)
+) -> list[str]:
+    headers = {"Authorization": f"Bearer {token}"}
+
+    if len(app_ids) <= batch_threshold:
+        return get_appid_via_filter(app_ids, headers, timeout, proxy)
+    else:
+        return get_appid_via_batch(app_ids, headers, timeout, proxy)
+
+
+class AppProxyInfo(TypedDict):
+    app_appid: str
+    app_id: str
+    app_name: str
+    app_notes: str | None
+    cert_expiration: str
+    cert_subject_name: str
+    cert_thumbprint: str
+    external_url: str
+    internal_url: str
+
+
+def get_entra_app_proxy_certs(
+    token: str, timeout: float, proxy: HTTPProxyConfig
+) -> list[AppProxyInfo]:
+    app_app_ids = get_entra_app_proxy_app_ids(token, timeout, proxy)
+
+    if not app_app_ids:
+        return []
+
+    app_object_ids = get_entra_app_proxy_object_ids(token, timeout, proxy, app_app_ids)
+
+    # onPremisesPublishing is not available in v1.0 (2025-02-09)
+    base_url = f"{GRAPH_API_BETA}/applications"
+    attributes = "appId,id,displayName,notes,onPremisesPublishing"
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    entra_app_proxy_apps = []
+
+    for app_id in app_object_ids:
+        entra_app_proxy_url = f"{base_url}/{app_id}?$select={attributes}"
+
+        try:
+            entra_app_proxy_app_response = requests.get(
+                entra_app_proxy_url,
+                headers=headers,
+                timeout=timeout,
+                proxies=proxy.to_requests_proxies(),
+            )
+            entra_app_proxy_app_response.raise_for_status()
+        except requests.exceptions.Timeout as err:
+            handle_error(err, "Timeout while getting Entra app proxy certificate.", 14)
+        except requests.exceptions.RequestException as err:
+            error_message = "Failed to get Entra app proxy certificate."
+            error_message_details = {
+                403: (
+                    f"{error_message} Please check application API permissions. At least "
+                    "Directory.Read.All is required."
+                ),
+                429: f"{error_message} Request has been throttled.",
+            }
+            status_code = getattr(err.response, "status_code", 0)
+            handle_error(err, error_message_details.get(status_code, error_message), 26)
+
+        entra_app_proxy_app_dict = entra_app_proxy_app_response.json()
+
+        app_on_prem = entra_app_proxy_app_dict.get("onPremisesPublishing", {})
+        if not app_on_prem.get("isOnPremPublishingEnabled"):
+            continue
+
+        cert_metadata = app_on_prem.get("verifiedCustomDomainCertificatesMetadata", {})
+        if not cert_metadata:
+            continue
+
+        entra_app_proxy_apps.append(entra_app_proxy_app_dict)
+
+    app_info_list: list[AppProxyInfo] = [
+        AppProxyInfo(
+            app_appid=app["appId"],
+            app_id=app["id"],
+            app_name=app["displayName"],
+            app_notes=app.get("notes"),
+            cert_expiration=cert.get("expiryDate"),
+            cert_subject_name=cert.get("subjectName"),
+            cert_thumbprint=cert.get("thumbprint"),
+            external_url=pub.get("externalUrl"),
+            internal_url=pub.get("internalUrl"),
+        )
+        for app in entra_app_proxy_apps
+        for pub in [app.get("onPremisesPublishing", {})]
+        for cert in [pub.get("verifiedCustomDomainCertificatesMetadata", {})]
+    ]
+
+    return app_info_list
+
+
 class AppCred(TypedDict):
-    cred_id: str
-    cred_name: str | None
-    cred_identifier: str | None
     cred_expiration: str
+    cred_id: str
+    cred_identifier: str | None
+    cred_name: str | None
 
 
 class AppRegistration(TypedDict):
-    app_name: str
     app_appid: str
+    app_creds: list[AppCred]
     app_id: str
+    app_name: str
     app_notes: str | None
     cred_type: str
-    app_creds: list[AppCred]
 
 
 def get_entra_app_registration_creds(
     token: str, timeout: float, proxy: HTTPProxyConfig
 ) -> list[AppRegistration]:
     entra_app_registrations_url = (
-        "https://graph.microsoft.com/v1.0/applications"
+        f"{GRAPH_API_V1}/applications"
         "?$select=appId,id,notes,displayName,keyCredentials,passwordCredentials"
     )
 
@@ -184,11 +426,7 @@ def get_entra_app_registration_creds(
             )
             entra_app_registration_response.raise_for_status()
         except requests.exceptions.Timeout as err:
-            handle_error(
-                err,
-                "Timeout while getting Entra app registrations.",
-                12,
-            )
+            handle_error(err, "Timeout while getting Entra app registrations.", 15)
         except requests.exceptions.RequestException as err:
             error_message = "Failed to get Entra app registrations."
             error_message_details = {
@@ -199,30 +437,30 @@ def get_entra_app_registration_creds(
                 429: f"{error_message} Request has been throttled.",
             }
             status_code = getattr(err.response, "status_code", 0)
-            handle_error(
-                err,
-                error_message_details.get(status_code, error_message),
-                2,
-            )
+            handle_error(err, error_message_details.get(status_code, error_message), 30)
 
         entra_app_registration_dict = entra_app_registration_response.json()
         entra_app_registrations.extend(entra_app_registration_dict.get("value", []))
 
-        # get next page if available (pagination)
+        # Get next page if available (pagination)
         entra_app_registrations_url = entra_app_registration_dict.get("@odata.nextLink")
 
     app_names = set()
     app_list: list[AppRegistration] = []
     for app in entra_app_registrations:
+        app_secrets = app.get("passwordCredentials", [])
+        app_certs = app.get("keyCredentials", [])
+
+        if not app_secrets and not app_certs:
+            continue
+
         app_name = app["displayName"]
         app_appid = app["appId"]
         app_id = app["id"]
         app_notes = app["notes"]
-        app_secrets = app.get("passwordCredentials", [])
-        app_certs = app.get("keyCredentials", [])
 
         # generate unique names, because entra app name is not unique
-        if app_name in app_names and (app_secrets or app_certs):
+        if app_name in app_names:
             app_name_unique = f"{app_name}_{app_id[-4:]}"
         else:
             app_name_unique = app_name
@@ -232,22 +470,22 @@ def get_entra_app_registration_creds(
             if creds:
                 app_creds_list: list[AppCred] = [
                     {
-                        "cred_id": cred["keyId"],
-                        "cred_name": cred["displayName"],
-                        "cred_identifier": cred["customKeyIdentifier"],
                         "cred_expiration": cred["endDateTime"],
+                        "cred_id": cred["keyId"],
+                        "cred_identifier": cred["customKeyIdentifier"],
+                        "cred_name": cred["displayName"],
                     }
                     for cred in creds
                 ]
 
                 app_list.append(
                     {
-                        "app_name": app_name_unique,
                         "app_appid": app_appid,
+                        "app_creds": app_creds_list,
                         "app_id": app_id,
+                        "app_name": app_name_unique,
                         "app_notes": app_notes,
                         "cred_type": cred_type,
-                        "app_creds": app_creds_list,
                     }
                 )
 
@@ -255,46 +493,40 @@ def get_entra_app_registration_creds(
 
 
 class VpnAppCert(TypedDict):
-    cert_id: str
-    cert_name: str
-    cert_identifier: str
     cert_expiration: str
+    cert_id: str
+    cert_identifier: str
+    cert_name: str
 
 
 class VpnApp(TypedDict):
-    app_name: str
     app_appid: str
-    app_id: str
     app_certs: list[VpnAppCert]
+    app_id: str
+    app_name: str
 
 
-def get_entra_ca_vpn_cert(token: str, timeout: float, proxy: HTTPProxyConfig) -> list[VpnApp]:
-    entra_ca_vpn_cert_url = (
-        "https://graph.microsoft.com/v1.0/servicePrincipals"
+def get_entra_ca_vpn_certs(token: str, timeout: float, proxy: HTTPProxyConfig) -> list[VpnApp]:
+    entra_ca_vpn_certs_url = (
+        f"{GRAPH_API_V1}/servicePrincipals"
         "?$filter=displayName eq 'VPN Server' and accountEnabled eq true"
         "&$select=appId,id,keyCredentials"
     )
 
     headers = {"Authorization": f"Bearer {token}"}
 
-    entra_ca_vpn_cert = []
-
     try:
-        entra_ca_vpn_cert_response = requests.get(
-            entra_ca_vpn_cert_url,
+        entra_ca_vpn_certs_response = requests.get(
+            entra_ca_vpn_certs_url,
             headers=headers,
             timeout=timeout,
             proxies=proxy.to_requests_proxies(),
         )
-        entra_ca_vpn_cert_response.raise_for_status()
+        entra_ca_vpn_certs_response.raise_for_status()
     except requests.exceptions.Timeout as err:
-        handle_error(
-            err,
-            "Timeout while getting Entra VPN Server service principal.",
-            13,
-        )
+        handle_error(err, "Timeout while getting Entra Conditional Access VPN certificate.", 16)
     except requests.exceptions.RequestException as err:
-        error_message = "Failed to get Entra Entra Conditional Access VPN certificate."
+        error_message = "Failed to get Entra Conditional Access VPN certificate."
         error_message_details = {
             403: (
                 f"{error_message} Please check application API permissions. At least "
@@ -303,37 +535,39 @@ def get_entra_ca_vpn_cert(token: str, timeout: float, proxy: HTTPProxyConfig) ->
             429: f"{error_message} Request has been throttled.",
         }
         status_code = getattr(err.response, "status_code", 0)
-        handle_error(
-            err,
-            error_message_details.get(status_code, error_message),
-            3,
-        )
+        handle_error(err, error_message_details.get(status_code, error_message), 40)
 
-    entra_ca_vpn_cert_dict = entra_ca_vpn_cert_response.json()
-    entra_ca_vpn_cert = entra_ca_vpn_cert_dict.get("value", [])
+    entra_ca_vpn_certs_dict = entra_ca_vpn_certs_response.json()
+    entra_ca_vpn_certs = entra_ca_vpn_certs_dict.get("value", [])
 
     app_list: list[VpnApp] = []
-    for app in entra_ca_vpn_cert:
+    for app in entra_ca_vpn_certs:
         app_cert_list: list[VpnAppCert] = []
         for cert in app["keyCredentials"]:
             if cert["key"]:
                 app_cert: VpnAppCert = {
-                    "cert_id": cert["keyId"],
-                    "cert_name": cert["displayName"],
-                    "cert_identifier": cert["customKeyIdentifier"],
                     "cert_expiration": cert["endDateTime"],
+                    "cert_id": cert["keyId"],
+                    "cert_identifier": cert["customKeyIdentifier"],
+                    "cert_name": cert["displayName"],
                 }
                 app_cert_list.append(app_cert)
 
         app_dict: VpnApp = {
             "app_appid": app["appId"],
+            "app_certs": app_cert_list,
             "app_id": app["id"],
             "app_name": "VPN Server",
-            "app_certs": app_cert_list,
         }
 
         app_list.append(app_dict)
 
+    # Handle the edge case: exactly one app found, but no certificates to monitor.
+    # In all other cases (0 apps, 1 app with certs, or multiple apps), return app_list as-is.
+    # The check script will handle the logic:
+    #   - Empty list → no service displayed
+    #   - One app with certs → monitor certificates
+    #   - Multiple apps → return UNKNOWN (cannot determine which is the CA VPN app)
     if len(app_list) == 1 and not app_list[0]["app_certs"]:
         return []
 
@@ -349,7 +583,7 @@ def get_entra_sync(
     token: str, tenant_id: str, timeout: float, proxy: HTTPProxyConfig
 ) -> EntraSyncStatus:
     entra_sync_url = (
-        f"https://graph.microsoft.com/v1.0/organization/{tenant_id}"
+        f"{GRAPH_API_V1}/organization/{tenant_id}"
         "?$select=onPremisesLastSyncDateTime,onPremisesSyncEnabled"
     )
 
@@ -361,13 +595,8 @@ def get_entra_sync(
         )
         entra_sync_response.raise_for_status()
     except requests.exceptions.Timeout as err:
-        handle_error(
-            err,
-            "Timeout while getting Entra Connect/Cloud Sync.",
-            14,
-        )
+        handle_error(err, "Timeout while getting Entra Connect/Cloud Sync.", 17)
     except requests.exceptions.RequestException as err:
-        print(err)
         error_message = "Failed to get Entra Connect/Cloud Sync."
         error_message_details = {
             403: (
@@ -377,11 +606,7 @@ def get_entra_sync(
             429: f"{error_message} Request has been throttled.",
         }
         status_code = getattr(err.response, "status_code", 0)
-        handle_error(
-            err,
-            error_message_details.get(status_code, error_message),
-            4,
-        )
+        handle_error(err, error_message_details.get(status_code, error_message), 50)
 
     entra_sync_dict = entra_sync_response.json()
 
@@ -405,7 +630,7 @@ class SamlInfo(TypedDict):
 def get_entra_saml_certs(token: str, timeout: float, proxy: HTTPProxyConfig) -> list[SamlInfo]:
     # preferredTokenSigningKeyEndDateTime is not available in v1.0 (2025-02-09)
     entra_saml_certs_url = (
-        "https://graph.microsoft.com/beta/servicePrincipals"
+        f"{GRAPH_API_BETA}/servicePrincipals"
         "?$filter=preferredSingleSignOnMode eq 'saml' and accountEnabled eq true"
         "&$select=appId,id,displayName,notes,preferredTokenSigningKeyEndDateTime,"
         "preferredTokenSigningKeyThumbprint"
@@ -426,9 +651,7 @@ def get_entra_saml_certs(token: str, timeout: float, proxy: HTTPProxyConfig) -> 
             entra_saml_certs_response.raise_for_status()
         except requests.exceptions.Timeout as err:
             handle_error(
-                err,
-                "Timeout while getting Entra service principals with SAML configured.",
-                15,
+                err, "Timeout while getting Entra service principals with SAML configured.", 18
             )
         except requests.exceptions.RequestException as err:
             error_message = "Failed to get Entra service principals with SAML configured."
@@ -440,32 +663,25 @@ def get_entra_saml_certs(token: str, timeout: float, proxy: HTTPProxyConfig) -> 
                 429: f"{error_message} Request has been throttled.",
             }
             status_code = getattr(err.response, "status_code", 0)
-            handle_error(
-                err,
-                error_message_details.get(status_code, error_message),
-                4,
-            )
+            handle_error(err, error_message_details.get(status_code, error_message), 60)
 
         entra_saml_certs_dict = entra_saml_certs_response.json()
         entra_saml_certs.extend(entra_saml_certs_dict.get("value", []))
 
-        # get next page if available (pagination)
+        # Get next page if available (pagination)
         entra_saml_certs_url = entra_saml_certs_dict.get("@odata.nextLink")
 
-    saml_info_list: list[SamlInfo] = sorted(
-        [
-            SamlInfo(
-                app_appid=app["appId"],
-                app_id=app["id"],
-                app_name=app["displayName"],
-                app_notes=app["notes"],
-                cert_expiration=app["preferredTokenSigningKeyEndDateTime"],
-                cert_thumbprint=app["preferredTokenSigningKeyThumbprint"],
-            )
-            for app in entra_saml_certs
-        ],
-        key=lambda x: x["app_id"],
-    )
+    saml_info_list: list[SamlInfo] = [
+        SamlInfo(
+            app_appid=app["appId"],
+            app_id=app["id"],
+            app_name=app["displayName"],
+            app_notes=app["notes"],
+            cert_expiration=app["preferredTokenSigningKeyEndDateTime"],
+            cert_thumbprint=app["preferredTokenSigningKeyThumbprint"],
+        )
+        for app in entra_saml_certs
+    ]
 
     return saml_info_list
 
@@ -481,9 +697,14 @@ def main():
     pw_id, pw_path = args.app_secret.split(":")
     app_secret = cmk.utils.password_store.lookup(Path(pw_path), pw_id)
 
-    resource_scope = "https://graph.microsoft.com/.default"
+    resource_scope = f"{GRAPH_API_BASE}/.default"
 
     token = get_access_token(tenant_id, app_id, app_secret, resource_scope, timeout, proxy)
+
+    if "entra_app_proxy_certs" in services_to_monitor:
+        entra_app_proxy_certs = get_entra_app_proxy_certs(token, timeout, proxy)
+        print("<<<ms_entra_app_proxy_certs:sep(0)>>>")
+        print(json.dumps(entra_app_proxy_certs))
 
     if "entra_app_registration_creds" in services_to_monitor:
         entra_app_registration_creds = get_entra_app_registration_creds(token, timeout, proxy)
@@ -491,9 +712,9 @@ def main():
         print(json.dumps(entra_app_registration_creds))
 
     if "entra_ca_vpn_cert" in services_to_monitor:
-        entra_ca_vpn_cert = get_entra_ca_vpn_cert(token, timeout, proxy)
+        entra_ca_vpn_certs = get_entra_ca_vpn_certs(token, timeout, proxy)
         print("<<<ms_entra_ca_vpn_cert:sep(0)>>>")
-        print(json.dumps(entra_ca_vpn_cert))
+        print(json.dumps(entra_ca_vpn_certs))
 
     if "entra_sync" in services_to_monitor:
         entra_sync = get_entra_sync(token, tenant_id, timeout, proxy)

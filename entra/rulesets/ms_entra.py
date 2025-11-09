@@ -136,7 +136,8 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                         "Select the Microsoft Intune services that you want to monitor.<br>"
                         "Ensure that you add the required Microsoft Graph API permissions "
                         "to your Microsoft Entra app registration and grant admin consent to them."
-                        "<br><br>Minimum API <b>application</b> permissions:<ul>"
+                        "<br><br>Minimum API <b>application</b> permissions:<ul><li>"
+                        "<b>Entra app proxy certificates</b>: <tt>Directory.Read.All</tt></li>"
                         "<li><b>Entra app registration credentials</b>: <tt>Application.Read.All"
                         "</tt></li><li><b>Entra CA VPN certificate</b>: <tt>Application.Read.All"
                         "</tt></li><li><b>Entra Connect/Cloud Sync</b>: <tt>Organization.Read.All"
@@ -144,6 +145,10 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                         "</tt></li></ul>"
                     ),
                     elements=[
+                        MultipleChoiceElement(
+                            name="entra_app_proxy_certs",
+                            title=Title("Entra app proxy certificates"),
+                        ),
                         MultipleChoiceElement(
                             name="entra_app_registration_creds",
                             title=Title("Entra app registration credentials"),
@@ -172,6 +177,7 @@ def _parameter_form_special_agent_ms_entra() -> Dictionary:
                     ],
                     prefill=DefaultValue(
                         [
+                            "entra_app_proxy_certs",
                             "entra_app_registration_creds",
                             "entra_ca_vpn_cert",
                             "entra_sync",

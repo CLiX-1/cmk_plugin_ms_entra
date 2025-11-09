@@ -36,6 +36,23 @@ from cmk.graphing.v1.perfometers import Closed, FocusRange, Open, Perfometer
 UNIT_TIME = Unit(TimeNotation())
 
 # --------------------------------------------------------------------------------------------------
+# Microsoft Entra App Proxy Certificate
+# --------------------------------------------------------------------------------------------------
+
+metric_ms_entra_app_proxy_cert_remaining_validity = Metric(
+    name="ms_entra_app_proxy_cert_remaining_validity",
+    title=Title("Remaining app proxy cert validity time"),
+    unit=UNIT_TIME,
+    color=Color.YELLOW,
+)
+
+perfometer_ms_entra_app_proxy_cert_remaining_validity = Perfometer(
+    name="ms_entra_app_proxy_cert_remaining_validity",
+    focus_range=FocusRange(Closed(0), Open(15552000)),
+    segments=["ms_entra_app_proxy_cert_remaining_validity"],
+)
+
+# --------------------------------------------------------------------------------------------------
 # Microsoft Entra App Credentials
 # --------------------------------------------------------------------------------------------------
 
