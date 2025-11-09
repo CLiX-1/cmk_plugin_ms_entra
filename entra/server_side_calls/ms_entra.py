@@ -48,7 +48,7 @@ class Params(BaseModel):
     timeout: float = 10.0
 
 
-def generate_special_agent_commands(
+def _generate_special_agent_commands(
     params: Params,
     _host_config: HostConfig,
 ) -> Iterator[SpecialAgentCommand]:
@@ -80,5 +80,5 @@ def generate_special_agent_commands(
 special_agent_ms_entra = SpecialAgentConfig(
     name="ms_entra",
     parameter_parser=Params.model_validate,
-    commands_function=generate_special_agent_commands,
+    commands_function=_generate_special_agent_commands,
 )
