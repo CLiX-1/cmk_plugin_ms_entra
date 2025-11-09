@@ -9,6 +9,7 @@ See the Checkmk [documentation](https://docs.checkmk.com/latest/en/mkps.html) fo
 ## Plugin Information
 
 The Plugin provides monitoring for the following components:
+- Microsoft Entra App Proxy Certificates
 - Microsoft Entra App Registration Credentials
 - Microsoft Entra CA VPN Certificate
 - Microsoft Entra Connect/Cloud Sync
@@ -23,6 +24,7 @@ To access the API, you need a Microsoft Entra tenant and a Microsoft Entra app r
 
 You need at least the following API **application** permissions for your app registration to use all the checks:
 - *Application.Read.All*
+- *Directory.Read.ALl*
 - *Organization.Read.All*
 
 For a more granular options, the required API permissions per check are listed in the next sections.
@@ -43,6 +45,28 @@ When you configure the Special Agent, you have the option to select only the ser
 
 ## Check Details
 
+### Microsoft Entra App Proxy Certificates
+
+#### Description
+
+This check monitors the expiration time of custom certificates from Entra app proxies.
+
+#### Checkmk Service Example
+
+<img width="1064" height="59" alt="grafik" src="https://github.com/user-attachments/assets/6d580262-d010-4a71-815b-fedd984bd1e6" />
+
+#### Checkmk Parameters
+
+1. **Certificate expiration**: Specify the lower levels for the Microsoft Entra app proxy certificates expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the certificate expiration, select "No levels".
+
+#### Microsoft Graph API
+
+**API Permissions**: At least *Directory.Read.All* (Application permission)
+
+**Endpoints**: `https://graph.microsoft.com/beta/applications`, `https://graph.microsoft.com/v1.0/servicePrincipals`
+
+---
+
 ### Microsoft Entra App Registration Credentials
 
 #### Description
@@ -55,8 +79,8 @@ This check monitors the expiration time of secrets and certificates from Entra a
 
 #### Checkmk Parameters
 
-1. **Credential Expiration**: Specify the lower levels for the Microsoft Entra app credential expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the credential expiration, select "No levels".
-2. **Exclude Credentials**: Specify a list of credential descriptions that you do not want to monitor.
+1. **Credential expiration**: Specify the lower levels for the Microsoft Entra app credential expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the credential expiration, select "No levels".
+2. **Exclude credentials**: Specify a list of credential descriptions that you do not want to monitor.
 
 #### Microsoft Graph API
 
@@ -78,7 +102,7 @@ This check monitors the expiration time of the Entra Conditional Access VPN cert
 
 #### Checkmk Parameters
 
-1. **Certificate Expiration**: Specify the lower levels for the Microsoft Entra Conditional Access VPN certificate expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the certificate expiration, select "No levels".
+1. **Certificate expiration**: Specify the lower levels for the Microsoft Entra Conditional Access VPN certificate expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the certificate expiration, select "No levels".
 
 #### Microsoft Graph API
 
@@ -100,11 +124,11 @@ This check monitors the time since the last Entra Connect/Cloud Sync synchronisa
 
 #### Checkmk Parameters
 
-1. **Time Since Last Sync**: Specify the upper levels for the last sync time from Microsoft Entra Connect/Cloud Sync. The default values are 1 hour (WARN) and 3 hours (CRIT). To ignore the last sync time, select "No levels".
+1. **Time since last sync**: Specify the upper levels for the last sync time from Microsoft Entra Connect/Cloud Sync. The default values are 1 hour (WARN) and 3 hours (CRIT). To ignore the last sync time, select "No levels".
 
 #### Microsoft Graph API
 
-**API Permissions**: At least *Organization.Read.All* (Application permission)
+**API permissions**: At least *Organization.Read.All* (Application permission)
 
 **Endpoint**: `https://graph.microsoft.com/v1.0/organization/{organizationId}`
 
@@ -122,7 +146,7 @@ This check monitors the expiration time of certificates from Entra enterprise ap
 
 #### Checkmk Parameters
 
-1. **Certificate Expiration**: Specify the lower levels for the Microsoft Entra SAML app certificate expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the certificate expiration, select "No levels".
+1. **Certificate expiration**: Specify the lower levels for the Microsoft Entra SAML app certificate expiration time. The default values are 14 days (WARN) and 5 days (CRIT). To ignore the certificate expiration, select "No levels".
 
 #### Microsoft Graph API
 
